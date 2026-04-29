@@ -289,6 +289,74 @@ _51W_Telemetry.ensureUser()
 _51W_Telemetry.track "script_loaded"
 
 
+-- ============================================================
+-- 自动更新模块
+-- ============================================================
+global _51W_Updater
+(
+    -- 在脚本加载时捕获路径（rollout 内 getSourceFileName 可能失效）
+    local _scriptPath = getSourceFileName()
+
+    struct _51W_UpdaterStruct (
+        localVersion  = "3.0.0",
+        rawBase       = "https://raw.githubusercontent.com/yimu-zhao/MaxScriptTools/main/",
+        pat           = "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",
+        iniPath       = (getDir #userScripts) + "\\_51W_Telemetry.ini",
+        scriptPath    = "",
+
+        -- 返回 remoteVer 是否大于 localVersion
+        fn isNewer remoteVer = (
+            try (
+                local r = filterString remoteVer "."
+                local l = filterString localVersion "."
+                for i = 1 to (max r.count l.count) do (
+                    local rv = if i <= r.count then (r[i] as integer) else 0
+                    local lv = if i <= l.count then (l[i] as integer) else 0
+                    if rv > lv then return true
+                    if lv > rv then return false
+                )
+                false
+            ) catch false
+        ),
+
+        fn makeWebClient = (
+            local wc = dotNetObject "System.Net.WebClient"
+            wc.Encoding = (dotNetClass "System.Text.Encoding").UTF8
+            wc.Headers.Add "Authorization" ("token " + pat)
+            wc.Headers.Add "User-Agent" "MaxScript-UE-ResourceTool"
+            wc
+        ),
+
+        fn checkAndUpdate = (
+            try (
+                if scriptPath == "" or not (doesFileExist scriptPath) do return undefined
+                -- INI 开关：Updater / AutoUpdate = false 可关闭
+                if (getINISetting iniPath "Updater" "AutoUpdate") == "false" do return undefined
+
+                local remoteVer = trimRight ((makeWebClient().DownloadString (rawBase + "version.txt")) as string)
+
+                if isNewer remoteVer do (
+                    local ans = queryBox ("发现新版本 " + remoteVer + "（当前 " + localVersion + "）\n\n是否立即下载更新？\n下载完成后请重新运行脚本。") \
+                        title:"UE_ResourceTool 有更新"
+                    if ans do (
+                        local newContent = (makeWebClient().DownloadString (rawBase + "UE_ResourceTool.ms")) as string
+                        local f = createFile scriptPath
+                        if f != undefined do (
+                            format "%" newContent to:f
+                            close f
+                            messageBox "✅ 更新完成！\n请重新运行脚本以加载新版本。" title:"更新成功"
+                        )
+                    )
+                )
+            ) catch ()
+        )
+    )
+
+    _51W_Updater = _51W_UpdaterStruct scriptPath:_scriptPath
+    _51W_Updater.checkAndUpdate()
+)
+
+
 -- 1. 烘焙AO贴图
 rollout rl_BakeAO "烘焙AO贴图" (
     button btn_bake "烘焙AO贴图" width:200 height:26 align:#center
