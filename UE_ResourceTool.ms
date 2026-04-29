@@ -1,10 +1,10 @@
 /*
- * 51WORLD 虚幻资源自动转换工具 Version 3
- * 兼容: 3ds Max 2025+  |  支持: UE4 / UE5 FBX导出
+ * 51WORLD �����Դ�Զ�ת������ Version 3
+ * ����: 3ds Max 2025+  |  ֧��: UE4 / UE5 FBX����
  */
 try (closeRolloutFloater _51W_Floater) catch ()
 
--- 全局共享状态
+-- ȫ�ֹ���״̬
 global _51W_Data
 struct _51W_DataStruct (
     exportPath = "", importBasePath = "", batchFileList = #(),
@@ -108,7 +108,7 @@ struct _51W_DataStruct (
         g.DrawString s.Text f (dotNetObject "System.Drawing.SolidBrush" txC) (dotNetObject "System.Drawing.PointF" 8.0 0.0)
     ),
 
-    -- UI 辅助: 返回 #(bgColor, fgColor, btnColor, defaultFont)
+    -- UI ����: ���� #(bgColor, fgColor, btnColor, defaultFont)
     fn getUIColors = (
         local bgRGB = (colorMan.getColor #background) * 255
         local txRGB = (colorMan.getColor #text) * 255
@@ -151,7 +151,7 @@ struct _51W_DataStruct (
         s.DecimalPlaces = dec; s.Increment = inc
         s.BackColor = ui[3]; s.ForeColor = ui[2]
         s.Bounds = dotNetObject "System.Drawing.Rectangle" x y w h
-        -- 让 Max 不拦截键盘输入（允许手动输入数值）
+        -- �� Max �����ؼ������루�����ֶ�������ֵ��
         dotNet.addEventHandler s "GotFocus"  (fn sender e = (enableAccelerators = false))
         dotNet.addEventHandler s "LostFocus" (fn sender e = (enableAccelerators = true))
         parent.controls.add s; s
@@ -168,18 +168,18 @@ _51W_Data = _51W_DataStruct()
 
 
 -- ============================================================
--- 匿名使用统计 (PostHog Telemetry)
+-- ����ʹ��ͳ�� (PostHog Telemetry)
 -- ------------------------------------------------------------
--- 工作原理:
---   1. 启动时上报 $script_loaded
---   2. 各功能按钮点击时上报 feature_used (功能名 + 参数)
---   3. 报错时上报 error_occurred (错误信息 + 上下文)
---   user_id = MD5(用户名+电脑名)，匿名不可逆
---   用户可在 INI 中关闭(set Enabled=false)
+-- ����ԭ��:
+--   1. ����ʱ�ϱ� $script_loaded
+--   2. �����ܰ�ť���ʱ�ϱ� feature_used (������ + ����)
+--   3. ����ʱ�ϱ� error_occurred (������Ϣ + ������)
+--   user_id = MD5(�û���+������)������������
+--   �û����� INI �йر�(set Enabled=false)
 -- ============================================================
 global _51W_Telemetry
 struct _51W_TelemetryStruct (
-    -- ★ 在这里填入你从 PostHog 拿到的 Project API Key (phc_ 开头) ★
+    -- �� ������������� PostHog �õ��� Project API Key (phc_ ��ͷ) ��
     apiKey = "phc_y4SakH8nP3PwXrkZyBGjNF2dqDh67wgN8qnk2xYMzfom",
     apiHost = "https://us.i.posthog.com",
     scriptVersion = "3.0.0",
@@ -189,7 +189,7 @@ struct _51W_TelemetryStruct (
     distinctId = "",
     sessionId = "",
     sessionStart = 0,
-    pendingClients = #(),  -- 保持 WebClient 引用直到 async send 完成
+    pendingClients = #(),  -- ���� WebClient ����ֱ�� async send ���
 
     fn md5Hex s = (
         try (
@@ -212,7 +212,7 @@ struct _51W_TelemetryStruct (
         )
         local en = getINISetting iniPath "Telemetry" "Enabled"
         if en == "false" then enabled = false else enabled = true
-        -- 明文标识: 用户名@电脑名 (便于在 PostHog 里识别是谁)
+        -- ���ı�ʶ: �û���@������ (������ PostHog ��ʶ����˭)
         distinctId = (sysInfo.username) + "@" + (sysInfo.computername)
         setINISetting iniPath "Telemetry" "UserId" distinctId
         sessionId = (md5Hex (distinctId + (localTime as string) + (random 1 1000000) as string))
@@ -260,7 +260,7 @@ struct _51W_TelemetryStruct (
             wc.Headers.Add "Content-Type" "application/json"
             wc.Encoding = (dotNetClass "System.Text.Encoding").UTF8
             append pendingClients wc
-            -- 不挂事件回调；定期清空 pendingClients 防内存增长
+            -- �����¼��ص���������� pendingClients ���ڴ�����
             if pendingClients.count > 100 do pendingClients = #()
             local uri = dotNetObject "System.Uri" url
             wc.UploadStringAsync uri "POST" body
@@ -290,11 +290,11 @@ _51W_Telemetry.track "script_loaded"
 
 
 -- ============================================================
--- 自动更新模块
+-- �Զ�����ģ��
 -- ============================================================
 global _51W_Updater
 (
-    -- 在脚本加载时捕获路径（rollout 内 getSourceFileName 可能失效）
+    -- �ڽű�����ʱ����·����rollout �� getSourceFileName ����ʧЧ��
     local _scriptPath = getSourceFileName()
 
     struct _51W_UpdaterStruct (
@@ -309,7 +309,8 @@ global _51W_Updater
             try (
                 local r = filterString remoteVer "."
                 local l = filterString localVersion "."
-                for i = 1 to (max r.count l.count) do (
+                local cnt = if r.count > l.count then r.count else l.count
+                for i = 1 to cnt do (
                     local rv = if i <= r.count then (r[i] as integer) else 0
                     local lv = if i <= l.count then (l[i] as integer) else 0
                     if rv > lv then return true
@@ -333,13 +334,15 @@ global _51W_Updater
                 -- INI 开关：Updater / AutoUpdate = false 可关闭
                 if (getINISetting iniPath "Updater" "AutoUpdate") == "false" do return undefined
 
-                local remoteVer = trimRight ((makeWebClient().DownloadString (rawBase + "version.txt")) as string)
+                local wc1 = makeWebClient()
+                local remoteVer = trimRight ((wc1.DownloadString (rawBase + "version.txt")) as string)
 
                 if isNewer remoteVer do (
                     local ans = queryBox ("发现新版本 " + remoteVer + "（当前 " + localVersion + "）\n\n是否立即下载更新？\n下载完成后请重新运行脚本。") \
                         title:"UE_ResourceTool 有更新"
                     if ans do (
-                        local newContent = (makeWebClient().DownloadString (rawBase + "UE_ResourceTool.ms")) as string
+                        local wc2 = makeWebClient()
+                        local newContent = (wc2.DownloadString (rawBase + "UE_ResourceTool.ms")) as string
                         local f = createFile scriptPath
                         if f != undefined do (
                             format "%" newContent to:f
@@ -357,11 +360,11 @@ global _51W_Updater
 )
 
 
--- 1. 烘焙AO贴图
-rollout rl_BakeAO "烘焙AO贴图" (
-    button btn_bake "烘焙AO贴图" width:200 height:26 align:#center
-    button btn_show "显示AO贴图" width:200 height:26 align:#center
-    spinner spn_size "贴图: " range:[64,8192,1024] type:#integer fieldWidth:100 align:#center
+-- 1. �決AO��ͼ
+rollout rl_BakeAO "�決AO��ͼ" (
+    button btn_bake "�決AO��ͼ" width:200 height:26 align:#center
+    button btn_show "��ʾAO��ͼ" width:200 height:26 align:#center
+    spinner spn_size "��ͼ: " range:[64,8192,1024] type:#integer fieldWidth:100 align:#center
 
     fn getBaseName obj = (
         local pfx = _51W_Data.meshPrefix
@@ -387,7 +390,7 @@ rollout rl_BakeAO "烘焙AO贴图" (
         ) else (
             try (mat.emission_map = bmp) catch (
                 try (mat.selfIllumMap = bmp) catch (
-                    format "无法为材质 % 指定AO贴图，请手动设置。\n" mat.name
+                    format "�޷�Ϊ���� % ָ��AO��ͼ�����ֶ����á�\n" mat.name
                 )
             )
         )
@@ -396,21 +399,21 @@ rollout rl_BakeAO "烘焙AO贴图" (
     on btn_bake pressed do (
         _51W_Telemetry.track "feature_used" props:#("feature", "BakeAO")
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"烘焙AO"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"�決AO"; return ())
         local sz = spn_size.value
         local oldRend = renderers.current
         renderers.current = Default_Scanline_Renderer()
 
-        -- 创建临时天光
+        -- ������ʱ���
         local skyCls = undefined
         for c in light.classes where (matchPattern (c as string) pattern:"Skylight") do (skyCls = c; exit)
         local sky = if skyCls != undefined then (skyCls name:"_AO_Sky_" multiplier:1.0 castShadows:true)
                     else (Omnilight name:"_AO_Sky_" pos:[0,0,5000] multiplier:1.0 castShadows:true)
 
-        -- 隐藏其他灯光
+        -- ���������ƹ�
         local hidden = for l in lights where l != sky and not l.isHidden collect (l.isHidden = true; l)
 
-        -- 替换材质为纯白
+        -- �滻����Ϊ����
         local origMats = for obj in objs collect obj.material
         undo "Bake AO" on (
             for obj in objs do (
@@ -434,7 +437,7 @@ rollout rl_BakeAO "烘焙AO贴图" (
             select objs
             render renderType:#bakeSelected vfb:off progressBar:true outputSize:[sz,sz]
         )
-        -- 恢复材质并自动挂载AO
+        -- �ָ����ʲ��Զ�����AO
         for i = 1 to objs.count do (
             objs[i].material = origMats[i]
             local aoFile = getAOPath objs[i]
@@ -444,32 +447,32 @@ rollout rl_BakeAO "烘焙AO贴图" (
         try (delete sky) catch ()
         for l in hidden do try (l.isHidden = false) catch ()
         renderers.current = oldRend
-        messageBox ("AO烘焙完成！已自动应用到材质。\n保存在: " + getAODir()) title:"烘焙AO"
+        messageBox ("AO�決��ɣ����Զ�Ӧ�õ����ʡ�\n������: " + getAODir()) title:"�決AO"
     )
 
     on btn_show pressed do (
         _51W_Telemetry.track "feature_used" props:#("feature", "BakeAO_Show")
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"显示AO"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"��ʾAO"; return ())
         for obj in objs do (
             local f = getAOPath obj
-            if doesFileExist f then display (openBitmap f) else format "未找到: %\n" f
+            if doesFileExist f then display (openBitmap f) else format "δ�ҵ�: %\n" f
         )
     )
 )
 
 
--- 2. 材质优化
-rollout rl_MatOptimize "材质优化" (
-    button btn_opt "优化材质" width:200 height:26 align:#center
-    label lbl_maxID "最多ID数目:  " align:#left offset:[0,4]
-    label lbl_srcMat "原材质数目:  " align:#left
-    label lbl_curMat "现材质数目:  " align:#left
+-- 2. �����Ż�
+rollout rl_MatOptimize "�����Ż�" (
+    button btn_opt "�Ż�����" width:200 height:26 align:#center
+    label lbl_maxID "���ID��Ŀ:  " align:#left offset:[0,4]
+    label lbl_srcMat "ԭ������Ŀ:  " align:#left
+    label lbl_curMat "�ֲ�����Ŀ:  " align:#left
 
     on btn_opt pressed do (
         _51W_Telemetry.track "feature_used" props:#("feature", "MatOptimize")
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"材质优化"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"�����Ż�"; return ())
         local maxID = 0, srcCnt = 0, allMats = #()
         for obj in objs do (
             local n = (_51W_Data.getMatIDs obj).numberSet
@@ -477,8 +480,8 @@ rollout rl_MatOptimize "材质优化" (
             if obj.material != undefined do
                 srcCnt += if classOf obj.material == MultiMaterial then obj.material.materialList.count else 1
         )
-        lbl_maxID.text = "最多ID数目:  " + maxID as string
-        lbl_srcMat.text = "原材质数目:  " + srcCnt as string
+        lbl_maxID.text = "���ID��Ŀ:  " + maxID as string
+        lbl_srcMat.text = "ԭ������Ŀ:  " + srcCnt as string
         undo "Optimize Materials" on (
             for obj in objs where obj.material != undefined and classOf obj.material == MultiMaterial do (
                 local used = _51W_Data.getMatIDs obj
@@ -499,14 +502,14 @@ rollout rl_MatOptimize "材质优化" (
             )
             for obj in objs where obj.material != undefined do appendIfUnique allMats obj.material
         )
-        lbl_curMat.text = "现材质数目:  " + allMats.count as string
-        messageBox "材质优化完成！" title:"材质优化"
+        lbl_curMat.text = "�ֲ�����Ŀ:  " + allMats.count as string
+        messageBox "�����Ż���ɣ�" title:"�����Ż�"
     )
 )
 
 
--- 3. 材质转换
-rollout rl_VrayConvert "材质转换" (
+-- 3. ����ת��
+rollout rl_VrayConvert "����ת��" (
     dotNetControl dnPanel "System.Windows.Forms.Panel" width:470 height:200 align:#center
 
     fn doConvert objList mode = (
@@ -544,29 +547,29 @@ rollout rl_VrayConvert "材质转换" (
         local ui = _51W_Data.getUIColors()
         dnPanel.BackColor = ui[1]
 
-        local gL = _51W_Data.makeGrp dnPanel "VRay材质转标准材质" 0 0 228 125 ui
-        local b = _51W_Data.makeBtn gL "转换选中内容" 14 28 200 28 ui
+        local gL = _51W_Data.makeGrp dnPanel "VRay����ת��׼����" 0 0 228 125 ui
+        local b = _51W_Data.makeBtn gL "ת��ѡ������" 14 28 200 28 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "(local o=selection as array;if o.count==0 do(messageBox \"\x8BF7\x5148\x9009\x62E9\x5BF9\x8C61\x3002\" title:\"VRay\";return());undo \"V\" on(messageBox((rl_VrayConvert.doConvert o \"vray\") as string+\" \x4E2A\x5BF9\x8C61\x5DF2\x8F6C\x6362\x3002\") title:\"VRay\"))")
-        b = _51W_Data.makeBtn gL "转换所有内容" 14 66 200 28 ui
+        b = _51W_Data.makeBtn gL "ת����������" 14 66 200 28 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "(if queryBox \"\x786E\x5B9A\x8F6C\x6362\x6240\x6709VRay\x6750\x8D28\xFF1F\" title:\"VRay\" do undo \"V\" on(messageBox((rl_VrayConvert.doConvert(objects as array)\"vray\") as string+\" \x4E2A\x5BF9\x8C61\x5DF2\x8F6C\x6362\x3002\") title:\"VRay\"))")
 
-        local gR = _51W_Data.makeGrp dnPanel "Physical材质转标准材质" 236 0 228 125 ui
-        b = _51W_Data.makeBtn gR "转换选中内容" 14 28 200 28 ui
+        local gR = _51W_Data.makeGrp dnPanel "Physical����ת��׼����" 236 0 228 125 ui
+        b = _51W_Data.makeBtn gR "ת��ѡ������" 14 28 200 28 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "(local o=selection as array;if o.count==0 do(messageBox \"\x8BF7\x5148\x9009\x62E9\x5BF9\x8C61\x3002\" title:\"Physical\";return());undo \"P\" on(messageBox((rl_VrayConvert.doConvert o \"physical\") as string+\" \x4E2A\x5BF9\x8C61\x5DF2\x8F6C\x6362\x3002\") title:\"Physical\"))")
-        b = _51W_Data.makeBtn gR "转换所有内容" 14 66 200 28 ui
+        b = _51W_Data.makeBtn gR "ת����������" 14 66 200 28 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "(if queryBox \"\x786E\x5B9A\x8F6C\x6362\x6240\x6709Physical\x6750\x8D28\xFF1F\" title:\"Physical\" do undo \"P\" on(messageBox((rl_VrayConvert.doConvert(objects as array)\"physical\") as string+\" \x4E2A\x5BF9\x8C61\x5DF2\x8F6C\x6362\x3002\") title:\"Physical\"))")
 
-        local gT = _51W_Data.makeGrp dnPanel "显示材质纹理 | 在视口中显示贴图" 0 130 464 65 ui
-        b = _51W_Data.makeBtn gT "显示选中对象纹理" 14 28 200 28 ui
+        local gT = _51W_Data.makeGrp dnPanel "��ʾ�������� | ���ӿ�����ʾ��ͼ" 0 130 464 65 ui
+        b = _51W_Data.makeBtn gT "��ʾѡ�ж�������" 14 28 200 28 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "(local o=selection as array;if o.count==0 do(messageBox \"\x8BF7\x5148\x9009\x62E9\x5BF9\x8C61\x3002\" title:\"\x663E\x793A\x7EB9\x7406\";return());messageBox((rl_VrayConvert.showTexInViewport o) as string+\" \x4E2A\x5BF9\x8C61\x5DF2\x5F00\x542F\x7EB9\x7406\x663E\x793A\x3002\") title:\"\x663E\x793A\x7EB9\x7406\")")
-        b = _51W_Data.makeBtn gT "显示所有对象纹理" 236 28 200 28 ui
+        b = _51W_Data.makeBtn gT "��ʾ���ж�������" 236 28 200 28 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "(messageBox((rl_VrayConvert.showTexInViewport(objects as array)) as string+\" \x4E2A\x5BF9\x8C61\x5DF2\x5F00\x542F\x7EB9\x7406\x663E\x793A\x3002\") title:\"\x663E\x793A\x7EB9\x7406\")")
     )
 )
 
 
--- 4. 一键自动命名
-rollout rl_AutoName "一键自动命名" width:490 (
+-- 4. һ���Զ�����
+rollout rl_AutoName "һ���Զ�����" width:490 (
     dotNetControl dnPanel "System.Windows.Forms.Panel" width:470 height:140 align:#center
     local txtMatPfx, txtTexPfx, txtMeshPfx, txtMeshMid
 
@@ -585,7 +588,7 @@ rollout rl_AutoName "一键自动命名" width:490 (
         for i = 1 to n do try (local s = getSubTexmap node i; if s != undefined do collectBitmaps s result) catch ()
     )
 
-    -- 从贴图节点(可能有 Normal_Bump 等包装)中提取 BitmapTexture
+    -- ����ͼ�ڵ�(������ Normal_Bump �Ȱ�װ)����ȡ BitmapTexture
     fn extractBmp texmap = (
         if texmap == undefined do return undefined
         if classOf texmap == BitmapTexture do return texmap
@@ -597,7 +600,7 @@ rollout rl_AutoName "一键自动命名" width:490 (
         undefined
     )
 
-    -- 按插槽类型收集贴图, 返回 #(#("_D", bmp), #("_R", bmp), ...)
+    -- ����������ռ���ͼ, ���� #(#("_D", bmp), #("_R", bmp), ...)
     fn getSlotBitmaps mat = (
         local result = #(); local seen = #()
         fn tryAdd r s sfx texmap = (
@@ -633,14 +636,14 @@ rollout rl_AutoName "一键自动命名" width:490 (
         local mid = if txtMeshMid != undefined then txtMeshMid.Text else ""
         _51W_Data.meshPrefix = pfx; _51W_Data.meshMid = mid
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"重命名"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"������"; return ())
         undo "Rename" on (
             for i = 1 to objs.count do (
                 local base = objs[i].name
                 if matchPattern base pattern:(pfx + "_*") do base = substring base (pfx.count + 2) -1
                 objs[i].name = pfx + (if mid != "" then ("_" + mid) else "") + "_" + base
             )
-            messageBox (objs.count as string + " 个对象已重命名。") title:"重命名"
+            messageBox (objs.count as string + " ����������������") title:"������"
         )
     )
 
@@ -648,7 +651,7 @@ rollout rl_AutoName "一键自动命名" width:490 (
         _51W_Telemetry.track "feature_used" props:#("feature", "AutoNameMaterial")
         local pfx = if txtMatPfx != undefined then txtMatPfx.Text else "MI_"
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"重命名材质"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"����������"; return ())
         local c = 0
         undo "Rename Mats" on (
             for obj in objs where obj.material != undefined do (
@@ -662,14 +665,14 @@ rollout rl_AutoName "一键自动命名" width:490 (
                 ) else (mat.name = pfx + base; c += 1)
             )
         )
-        messageBox (c as string + " 个材质已重命名。") title:"重命名材质"
+        messageBox (c as string + " ����������������") title:"����������"
     )
 
     fn doRenameTex = (
         _51W_Telemetry.track "feature_used" props:#("feature", "AutoNameTexture")
         local pfx = if txtTexPfx != undefined then txtTexPfx.Text else "T_"
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"重命名贴图"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"��������ͼ"; return ())
         local ok = 0, fail = 0
         undo "Rename Tex" on (
             for obj in objs where obj.material != undefined do (
@@ -690,58 +693,58 @@ rollout rl_AutoName "一键自动命名" width:490 (
                 )
             )
         )
-        local msg = "成功: " + ok as string
-        if fail > 0 do msg += "  失败: " + fail as string
-        messageBox msg title:"重命名贴图"
+        local msg = "�ɹ�: " + ok as string
+        if fail > 0 do msg += "  ʧ��: " + fail as string
+        messageBox msg title:"��������ͼ"
     )
 
     on rl_AutoName open do (
         local ui = _51W_Data.getUIColors()
         dnPanel.BackColor = ui[1]
 
-        -- 第一行: 一键模型改名 GroupBox
-        local gM = _51W_Data.makeGrp dnPanel "一键模型改名" 0 0 464 55 ui
-        _51W_Data.makeLbl gM "前缀名" 14 22 42 18 ui
+        -- ��һ��: һ��ģ�͸��� GroupBox
+        local gM = _51W_Data.makeGrp dnPanel "һ��ģ�͸���" 0 0 464 55 ui
+        _51W_Data.makeLbl gM "ǰ׺��" 14 22 42 18 ui
         txtMeshPfx = _51W_Data.makeTxt gM "SM" 58 20 50 22 ui
-        _51W_Data.makeLbl gM "中间名" 120 22 42 18 ui
+        _51W_Data.makeLbl gM "�м���" 120 22 42 18 ui
         txtMeshMid = _51W_Data.makeTxt gM "" 164 20 80 22 ui
-        local b = _51W_Data.makeBtn gM "一键模型改名" 310 18 140 26 ui
+        local b = _51W_Data.makeBtn gM "һ��ģ�͸���" 310 18 140 26 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_AutoName.doRename()")
 
-        -- 第二行: 材质名 + 贴图名
-        local gL = _51W_Data.makeGrp dnPanel "一键更换材质名" 0 60 228 78 ui
-        _51W_Data.makeLbl gL "材质前缀名" 10 20 70 18 ui
+        -- �ڶ���: ������ + ��ͼ��
+        local gL = _51W_Data.makeGrp dnPanel "һ������������" 0 60 228 78 ui
+        _51W_Data.makeLbl gL "����ǰ׺��" 10 20 70 18 ui
         txtMatPfx = _51W_Data.makeTxt gL "MI_" 82 18 60 22 ui
-        b = _51W_Data.makeBtn gL "自动更改材质名称" 14 46 200 26 ui
+        b = _51W_Data.makeBtn gL "�Զ����Ĳ�������" 14 46 200 26 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_AutoName.doRenameMat()")
 
-        local gR = _51W_Data.makeGrp dnPanel "一键更换贴图名" 236 60 228 78 ui
-        _51W_Data.makeLbl gR "贴图前缀名" 10 20 70 18 ui
+        local gR = _51W_Data.makeGrp dnPanel "һ��������ͼ��" 236 60 228 78 ui
+        _51W_Data.makeLbl gR "��ͼǰ׺��" 10 20 70 18 ui
         txtTexPfx = _51W_Data.makeTxt gR "T_" 82 18 60 22 ui
-        b = _51W_Data.makeBtn gR "自动修改贴图名称" 14 46 200 26 ui
+        b = _51W_Data.makeBtn gR "�Զ��޸���ͼ����" 14 46 200 26 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_AutoName.doRenameTex()")
     )
 )
 
 
--- 5. 虚幻_FBX导出插件
-rollout rl_FBXExport "批量导出" (
-    group "导出模式" (
-        radioButtons rdo_mode labels:#("导出选中模型为FBX", "剪切模型位置信息到剪切板") default:1 columns:2
+-- 5. ���_FBX�������
+rollout rl_FBXExport "��������" (
+    group "����ģʽ" (
+        radioButtons rdo_mode labels:#("����ѡ��ģ��ΪFBX", "����ģ��λ����Ϣ�����а�") default:1 columns:2
     )
-    group "导出设置" (
-        checkbox chk_grid "使用用户网格（命名必须为\"UE4_Grid\"）" checked:false across:2 align:#left
-        checkbox chk_origin "移动到(0,0,0)导出" checked:false align:#left
-        checkbox chk_ucx "包含UCX碰撞" checked:false across:2 align:#left
-        checkbox chk_dlg "显示导出设置" checked:false align:#left
+    group "��������" (
+        checkbox chk_grid "ʹ���û�������������Ϊ\"UE4_Grid\"��" checked:false across:2 align:#left
+        checkbox chk_origin "�ƶ���(0,0,0)����" checked:false align:#left
+        checkbox chk_ucx "����UCX��ײ" checked:false across:2 align:#left
+        checkbox chk_dlg "��ʾ��������" checked:false align:#left
     )
-    editText edt_path "导出路径:" text:"" fieldWidth:330 align:#left
+    editText edt_path "����·��:" text:"" fieldWidth:330 align:#left
     button btn_browse "..." width:28 height:20 align:#right offset:[-36,-23]
     button btn_clear "X" width:20 height:20 align:#right offset:[-8,-23]
-    button btn_open "打开导出路径" width:120 height:20 align:#center offset:[0,-2]
-    label lbl_prev "即将被导出的模型:" align:#left offset:[0,2]
+    button btn_open "�򿪵���·��" width:120 height:20 align:#center offset:[0,-2]
+    label lbl_prev "������������ģ��:" align:#left offset:[0,2]
     editText edt_list "" height:60 readOnly:true fieldWidth:460 align:#center offset:[0,-2]
-    button btn_export "导出选中模型" width:300 height:30 align:#center offset:[0,2]
+    button btn_export "����ѡ��ģ��" width:300 height:30 align:#center offset:[0,2]
 
     fn refreshPreview = (
         local txt = if edt_path.text != "" then (edt_path.text + "\n") else ""
@@ -752,22 +755,22 @@ rollout rl_FBXExport "批量导出" (
     )
 
     on rl_FBXExport open do refreshPreview()
-    on btn_browse pressed do (local p = getSavePath caption:"选择FBX导出路径"; if p != undefined do (edt_path.text = p; _51W_Data.exportPath = p; refreshPreview()))
+    on btn_browse pressed do (local p = getSavePath caption:"ѡ��FBX����·��"; if p != undefined do (edt_path.text = p; _51W_Data.exportPath = p; refreshPreview()))
     on btn_clear pressed do (edt_path.text = ""; _51W_Data.exportPath = "")
     on btn_open pressed do (if edt_path.text != "" and doesFileExist edt_path.text do shellLaunch "explorer.exe" edt_path.text)
 
     on btn_export pressed do (
         _51W_Telemetry.track "feature_used" props:#("feature", "FBXExport")
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择模型。" title:"FBX导出"; return ())
+        if objs.count == 0 do (messageBox "����ѡ��ģ�͡�" title:"FBX����"; return ())
         local ep = edt_path.text
-        if ep == "" do (messageBox "请先设置导出路径。" title:"FBX导出"; return ())
+        if ep == "" do (messageBox "�������õ���·����" title:"FBX����"; return ())
         makeDir ep all:true
 
         if rdo_mode.state == 1 then (
             undo "FBX Export" on (
                 local n = 0
-                -- FBX全局设置（只设一次）
+                -- FBXȫ�����ã�ֻ��һ�Σ�
                 for s in #(#("SmoothingGroups",true),#("Triangulate",false),#("EmbedTextures",false),
                     #("FileVersion","FBX201800"),#("UpAxis","Z"),#("ConvertUnit","cm"),
                     #("Animation",false),#("Skin",false),#("Shape",false),#("Cameras",false),#("Lights",false)) do
@@ -793,20 +796,20 @@ rollout rl_FBXExport "批量导出" (
             local s = ""
             for obj in objs do s += obj.name + " @ [" + obj.pos.x as string + "," + obj.pos.y as string + "," + obj.pos.z as string + "]\n"
             setClipBoardText s
-            messageBox ("已复制 " + objs.count as string + " 个位置到剪切板。") title:"FBX导出"
+            messageBox ("�Ѹ��� " + objs.count as string + " ��λ�õ����а塣") title:"FBX����"
         )
     )
 )
 
 
--- 6. 常用工具
-rollout rl_CommonTools "常用工具" (
-    button btn_clr "清理空物体" width:180 height:26 align:#center
-    button btn_ctr "归轴至中心" width:140 height:26 align:#left offset:[20,0]
-    button btn_bot "归轴至底部" width:140 height:26 align:#right offset:[-20,-30]
-    button btn_top "归轴至顶部" width:140 height:26 align:#left offset:[20,0]
-    button btn_org "归轴至原点" width:140 height:26 align:#right offset:[-20,-30]
-    button btn_rst "一键重置变换" width:180 height:26 align:#center
+-- 6. ���ù���
+rollout rl_CommonTools "���ù���" (
+    button btn_clr "����������" width:180 height:26 align:#center
+    button btn_ctr "����������" width:140 height:26 align:#left offset:[20,0]
+    button btn_bot "�������ײ�" width:140 height:26 align:#right offset:[-20,-30]
+    button btn_top "����������" width:140 height:26 align:#left offset:[20,0]
+    button btn_org "������ԭ��" width:140 height:26 align:#right offset:[-20,-30]
+    button btn_rst "һ�����ñ任" width:180 height:26 align:#center
     dotNetControl dnToolPanel "System.Windows.Forms.Panel" width:470 height:145 align:#center offset:[0,4]
     local spnQuadAngleCtrl
 
@@ -823,18 +826,18 @@ rollout rl_CommonTools "常用工具" (
         local ui = _51W_Data.getUIColors()
         dnToolPanel.BackColor = ui[1]
 
-        local gL = _51W_Data.makeGrp dnToolPanel "贴图2次幂化 | 选中对象后点击" 0 0 228 65 ui
-        local b = _51W_Data.makeBtn gL "贴图尺寸2次幂化" 14 24 200 28 ui
+        local gL = _51W_Data.makeGrp dnToolPanel "��ͼ2���ݻ� | ѡ�ж������" 0 0 228 65 ui
+        local b = _51W_Data.makeBtn gL "��ͼ�ߴ�2���ݻ�" 14 24 200 28 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_CommonTools.doPow2()")
 
-        local gR = _51W_Data.makeGrp dnToolPanel "生成法线 | 材质编辑器选中材质" 236 0 228 65 ui
-        b = _51W_Data.makeBtn gR "生成法线贴图" 14 24 200 28 ui
+        local gR = _51W_Data.makeGrp dnToolPanel "���ɷ��� | ���ʱ༭��ѡ�в���" 236 0 228 65 ui
+        b = _51W_Data.makeBtn gR "���ɷ�����ͼ" 14 24 200 28 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_CommonTools.doNmap()")
 
-        local gQ = _51W_Data.makeGrp dnToolPanel "去对角线 | 三角面还原四边面" 0 70 464 65 ui
-        _51W_Data.makeLbl gQ "平面阈值:" 14 28 60 20 ui
+        local gQ = _51W_Data.makeGrp dnToolPanel "ȥ�Խ��� | �����滹ԭ�ı���" 0 70 464 65 ui
+        _51W_Data.makeLbl gQ "ƽ����ֵ:" 14 28 60 20 ui
         spnQuadAngleCtrl = _51W_Data.makeSpn gQ 0.1 30.0 2.0 1 0.5 76 26 60 22 ui
-        b = _51W_Data.makeBtn gQ "去对角线" 150 24 200 28 ui
+        b = _51W_Data.makeBtn gQ "ȥ�Խ���" 150 24 200 28 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_CommonTools.doQuadrify()")
     )
 
@@ -852,7 +855,7 @@ rollout rl_CommonTools "常用工具" (
     on btn_clr pressed do undo "Clear Empty" on (
         local d = 0
         for obj in (for o in objects where _51W_Data.isEmptyObject o collect o) do (try (delete obj; d += 1) catch ())
-        messageBox ("清理 " + d as string + " 个空物体。") title:"清理"
+        messageBox ("���� " + d as string + " �������塣") title:"����"
     )
     on btn_ctr pressed do (local o = selObjs(); if o.count > 0 do undo "Pivot Center" on (for obj in o do obj.pivot = obj.center))
     on btn_bot pressed do (local o = selObjs(); if o.count > 0 do undo "Pivot Bottom" on (
@@ -864,28 +867,28 @@ rollout rl_CommonTools "常用工具" (
     on btn_org pressed do (local o = selObjs(); if o.count > 0 do undo "Pivot Origin" on (for obj in o do obj.pivot = [0,0,0]))
     on btn_rst pressed do (
         local o = selObjs()
-        if o.count == 0 do (messageBox "请先选择对象。" title:"重置变换"; return ())
+        if o.count == 0 do (messageBox "����ѡ�����" title:"���ñ任"; return ())
         undo "Reset XForm" on (for obj in o do (resetXForm obj; collapseStack obj))
-        messageBox "重置变换完成！" title:"重置变换"
+        messageBox "���ñ任��ɣ�" title:"���ñ任"
     )
 
     fn doQuadrify = (
         _51W_Telemetry.track "feature_used" props:#("feature", "Quadrify")
         local objs = selObjs()
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"去对角线"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"ȥ�Խ���"; return ())
         local angThresh = if spnQuadAngleCtrl != undefined then (spnQuadAngleCtrl.Value as float) else 2.0
         local totalRemoved = 0; local totalObj = 0
         local oldSubLevel = subObjectLevel
-        undo "去对角线" on (
+        undo "ȥ�Խ���" on (
             for obj in objs where superClassOf obj == GeometryClass do (
-                -- 转换为 Editable Poly
+                -- ת��Ϊ Editable Poly
                 if classOf obj.baseObject != Editable_Poly do convertToPoly obj
-                if classOf obj.baseObject != Editable_Poly do (format "无法转换: %\n" obj.name; continue)
+                if classOf obj.baseObject != Editable_Poly do (format "�޷�ת��: %\n" obj.name; continue)
 
                 local numE = polyop.getNumEdges obj
                 if numE == 0 do continue
 
-                -- 收集候选对角线: 两侧都是三角面且近似共面
+                -- �ռ���ѡ�Խ���: ���඼���������ҽ��ƹ���
                 local candidates = #()
                 for e = 1 to numE do (
                     local faces = polyop.getEdgeFaces obj e
@@ -901,11 +904,11 @@ rollout rl_CommonTools "常用工具" (
                     if ang < angThresh do append candidates #(e, ang, faces[1], faces[2])
                 )
 
-                -- 按平面度排序，最共面的优先
+                -- ��ƽ���������������
                 fn _cmpAng a b = (if a[2] < b[2] then -1 else if a[2] > b[2] then 1 else 0)
                 qsort candidates _cmpAng
 
-                -- 贪心配对: 每个三角面只合并一次
+                -- ̰�����: ÿ��������ֻ�ϲ�һ��
                 local usedFaces = #{}
                 local edgesToRemove = #{}
                 for c in candidates do (
@@ -927,20 +930,20 @@ rollout rl_CommonTools "常用工具" (
             )
         )
         subObjectLevel = oldSubLevel
-        messageBox (totalObj as string + " 个对象共移除 " + totalRemoved as string + " 条对角线。") title:"去对角线"
+        messageBox (totalObj as string + " �������Ƴ� " + totalRemoved as string + " ���Խ��ߡ�") title:"ȥ�Խ���"
     )
 
     fn doPow2 = (
         _51W_Telemetry.track "feature_used" props:#("feature", "TexturePow2")
         local objs = selObjs()
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"贴图2次幂化"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"��ͼ2���ݻ�"; return ())
         local processed = #(); local ok = 0; local fail = 0; local skip = 0
         for obj in objs where obj.material != undefined do (
             local bms = #(); collectBmps obj.material bms
             for bmp in bms do (
                 local fp = bmp.filename
                 if fp == undefined or fp == "" do continue
-                -- 尝试解析完整路径
+                -- ���Խ�������·��
                 if not doesFileExist fp do (
                     local resolved = mapPaths.getFullFilePath fp
                     if resolved != undefined and resolved != "" do fp = resolved
@@ -954,7 +957,7 @@ rollout rl_CommonTools "常用工具" (
                     local nw = nearestPow2 ow; local nh = nearestPow2 oh
                     if nw != ow or nh != oh then (
                         close img
-                        -- 使用dotNet进行缩放
+                        -- ʹ��dotNet��������
                         local dnImg = (dotNetClass "System.Drawing.Image").FromFile fp
                         local dst = dotNetObject "System.Drawing.Bitmap" nw nh
                         local gr = (dotNetClass "System.Drawing.Graphics").FromImage dst
@@ -979,19 +982,19 @@ rollout rl_CommonTools "常用工具" (
                 ) catch (fail += 1)
             )
         )
-        local msg = "修改: " + ok as string
-        if skip > 0 do msg += "  已是2次幂: " + skip as string
-        if fail > 0 do msg += "  失败: " + fail as string
-        messageBox msg title:"贴图2次幂化"
+        local msg = "�޸�: " + ok as string
+        if skip > 0 do msg += "  ����2����: " + skip as string
+        if fail > 0 do msg += "  ʧ��: " + fail as string
+        messageBox msg title:"��ͼ2���ݻ�"
     )
 
     fn doNmap = (
         _51W_Telemetry.track "feature_used" props:#("feature", "NormalMapGen")
-        -- 获取材质编辑器中当前选中的材质
+        -- ��ȡ���ʱ༭���е�ǰѡ�еĲ���
         local m = medit.GetCurMtl()
-        if m == undefined do (messageBox "请先在材质编辑器中选择一个材质。" title:"生成法线"; return ())
-        -- 如果选中的是MultiMaterial,提示选择子材质
-        if classOf m == MultiMaterial do (messageBox "请选择具体的子材质，而非多维材质。" title:"生成法线"; return ())
+        if m == undefined do (messageBox "�����ڲ��ʱ༭����ѡ��һ�����ʡ�" title:"���ɷ���"; return ())
+        -- ���ѡ�е���MultiMaterial,��ʾѡ���Ӳ���
+        if classOf m == MultiMaterial do (messageBox "��ѡ�������Ӳ��ʣ����Ƕ�ά���ʡ�" title:"���ɷ���"; return ())
 
         local hasBump = false; local diffTex = undefined
         if classOf m == StandardMaterial then (
@@ -1000,19 +1003,19 @@ rollout rl_CommonTools "常用工具" (
         ) else if classOf m == PhysicalMaterial then (
             hasBump = m.bump_map != undefined
             if m.base_color_map != undefined and classOf m.base_color_map == BitmapTexture do diffTex = m.base_color_map
-        ) else (messageBox ("不支持的材质类型: " + (classOf m) as string) title:"生成法线"; return ())
+        ) else (messageBox ("��֧�ֵĲ�������: " + (classOf m) as string) title:"���ɷ���"; return ())
 
-        if hasBump do (messageBox "该材质已有法线/凹凸贴图。" title:"生成法线"; return ())
-        if diffTex == undefined do (messageBox "该材质没有漫反射贴图，无法生成法线。" title:"生成法线"; return ())
+        if hasBump do (messageBox "�ò������з���/��͹��ͼ��" title:"���ɷ���"; return ())
+        if diffTex == undefined do (messageBox "�ò���û����������ͼ���޷����ɷ��ߡ�" title:"���ɷ���"; return ())
 
         local srcPath = diffTex.filename
-        if srcPath == undefined or srcPath == "" do (messageBox "贴图文件路径为空。" title:"生成法线"; return ())
+        if srcPath == undefined or srcPath == "" do (messageBox "��ͼ�ļ�·��Ϊ�ա�" title:"���ɷ���"; return ())
         if not doesFileExist srcPath do (
             local resolved = mapPaths.getFullFilePath srcPath
             if resolved != undefined and resolved != "" then srcPath = resolved
-            else (messageBox ("找不到贴图文件: " + srcPath) title:"生成法线"; return ())
+            else (messageBox ("�Ҳ�����ͼ�ļ�: " + srcPath) title:"���ɷ���"; return ())
         )
-        if not doesFileExist srcPath do (messageBox ("找不到贴图文件: " + srcPath) title:"生成法线"; return ())
+        if not doesFileExist srcPath do (messageBox ("�Ҳ�����ͼ�ļ�: " + srcPath) title:"���ɷ���"; return ())
 
         local dir = getFilenamePath srcPath
         local base = getFilenameFile srcPath
@@ -1059,24 +1062,24 @@ rollout rl_CommonTools "常用工具" (
             ) else if classOf m == PhysicalMaterial then (
                 m.bump_map = nBmp
             )
-            messageBox ("法线贴图已生成并应用!\n" + (filenameFromPath dstPath)) title:"生成法线"
-        ) catch (messageBox ("生成失败: " + (getCurrentException()) as string) title:"生成法线")
+            messageBox ("������ͼ�����ɲ�Ӧ��!\n" + (filenameFromPath dstPath)) title:"���ɷ���"
+        ) catch (messageBox ("����ʧ��: " + (getCurrentException()) as string) title:"���ɷ���")
     )
 )
 
 
--- 7. 样条线工具
-rollout rl_SplineTools "样条线工具" (
+-- 7. �����߹���
+rollout rl_SplineTools "�����߹���" (
     dotNetControl dnSplinePanel "System.Windows.Forms.Panel" width:470 height:330 align:#center
     local spnAngleCtrl
     local rbDirV, rbDirU, spnDensityCtrl
-    -- 截面扫描生成 状态
+    -- ����ɨ������ ״̬
     local pickedCross = undefined, pickedPath = undefined
     local lblCrossName, lblPathName
     local spnSteps
     local chkCap, chkFlip
 
-    -- 获取每条子样条线的独立长度（临时禁用修改器读取底层样条线）
+    -- ��ȡÿ���������ߵĶ������ȣ���ʱ�����޸�����ȡ�ײ������ߣ�
     fn getSplineLengths obj = (
         local lengths = #()
         local disabledMods = #()
@@ -1086,14 +1089,14 @@ rollout rl_SplineTools "样条线工具" (
         lengths
     )
 
-    -- 获取厘米/系统单位换算比
+    -- ��ȡ����/ϵͳ��λ�����
     fn getCmPerUnit = (
         local t = units.SystemType
         local b = case t of (#Inches:2.54; #Feet:30.48; #Miles:160934.0; #Millimeters:0.1; #Centimeters:1.0; #Meters:100.0; #Kilometers:100000.0; default:1.0)
         units.SystemScale * b
     )
 
-    -- 移除之前脚本添加的 PipeUVNorm 修改器
+    -- �Ƴ�֮ǰ�ű����ӵ� PipeUVNorm �޸���
     fn removeOldMods obj = (
         for i = obj.modifiers.count to 1 by -1 do (
             if obj.modifiers[i].name == "PipeUVNorm" do deleteModifier obj obj.modifiers[i]
@@ -1101,30 +1104,30 @@ rollout rl_SplineTools "样条线工具" (
     )
 
     -----------------------------------------------------------------
-    -- 截面扫描生成：辅助函数
+    -- ����ɨ�����ɣ���������
     -----------------------------------------------------------------
-    -- 安全归一化：长度接近 0 时返回 fallback
+    -- ��ȫ��һ�������Ƚӽ� 0 ʱ���� fallback
     fn safeNormalize v fallback = (
         if (length v) < 0.0001 then fallback else (normalize v)
     )
 
-    -- Cubic Bezier 求值
+    -- Cubic Bezier ��ֵ
     fn bezEval p0 p1 p2 p3 t = (
         local u = 1.0 - t
         u*u*u*p0 + 3*u*u*t*p1 + 3*u*t*t*p2 + t*t*t*p3
     )
-    -- Cubic Bezier 切线（未归一化）
+    -- Cubic Bezier ���ߣ�δ��һ����
     fn bezTan p0 p1 p2 p3 t = (
         local u = 1.0 - t
         3*u*u*(p1-p0) + 6*u*t*(p2-p1) + 3*t*t*(p3-p2)
     )
 
-    -- 判定一段（knot k 到 k+1）是否为直线
+    -- �ж�һ�Σ�knot k �� k+1���Ƿ�Ϊֱ��
     fn isStraightSeg obj si k p0 p1 p2 p3 = (
         local segType = try (getSegmentType obj si k) catch (#curve)
         if segType == #line then true
         else (
-            -- 即便类型为 curve，若控制柄退化成端点（无张力），也视为直线
+            -- ��������Ϊ curve�������Ʊ��˻��ɶ˵㣨����������Ҳ��Ϊֱ��
             local d = distance p0 p3
             if d < 0.0001 then true
             else (
@@ -1136,8 +1139,8 @@ rollout rl_SplineTools "样条线工具" (
         )
     )
 
-    -- 单条子样条线采样：返回 #(pos, tangent) 数组（切线已归一化）
-    -- stepsOverride: 曲线段细分数（每段 nSub 个等步），<=0 表示用样条线自身的 steps
+    -- �����������߲��������� #(pos, tangent) ���飨�����ѹ�һ����
+    -- stepsOverride: ���߶�ϸ������ÿ�� nSub ���Ȳ�����<=0 ��ʾ�������������� steps
     fn samplePathSpline obj si stepsOverride = (
         local samples = #()
         local nK = numKnots obj si
@@ -1155,15 +1158,15 @@ rollout rl_SplineTools "样条线工具" (
             local straight = isStraightSeg obj si k p0 p1 p2 p3
             local segDir = if (distance p0 p3) > 0.0001 then normalize (p3 - p0) else [1,0,0]
 
-            -- 起点（每段都发，便于合并阶段算 miter）
+            -- ��㣨ÿ�ζ��������ںϲ��׶��� miter��
             local startTanForEmit = if straight then segDir else (safeNormalize (bezTan p0 p1 p2 p3 0.0) segDir)
             append samples #(p0, startTanForEmit)
 
             if straight then (
-                -- 直线段：只追加终点
+                -- ֱ�߶Σ�ֻ׷���յ�
                 append samples #(p3, segDir)
             ) else (
-                -- 曲线段：按样条线的 steps 属性等步细分（与样条线显示一致）
+                -- ���߶Σ��������ߵ� steps ���ԵȲ�ϸ�֣�����������ʾһ�£�
                 local nSub = if stepsOverride > 0 then stepsOverride else (try (obj.steps + 1) catch (6))
                 if nSub < 1 do nSub = 1
                 for i = 1 to nSub do (
@@ -1174,7 +1177,7 @@ rollout rl_SplineTools "样条线工具" (
             )
         )
 
-        -- 闭合路径：去掉重复的尾点（与首点重合）
+        -- �պ�·����ȥ���ظ���β�㣨���׵��غϣ�
         if closed and samples.count > 1 do (
             local last = samples[samples.count][1]
             local first = samples[1][1]
@@ -1183,8 +1186,8 @@ rollout rl_SplineTools "样条线工具" (
         samples
     )
 
-    -- 用固定世界上方向（Z）构建每个 frame，避免 parallel transport 沿路径累积扭转
-    -- 返回数组：每个元素 #(pos, xAxis, yAxis, zAxis, scl)，z = 切线，scl = miter 横向缩放
+    -- �ù̶������Ϸ���Z������ÿ�� frame������ parallel transport ��·���ۻ�Ťת
+    -- �������飺ÿ��Ԫ�� #(pos, xAxis, yAxis, zAxis, scl)��z = ���ߣ�scl = miter ��������
     fn buildFrames samples =
     (
         local frames = #()
@@ -1194,7 +1197,7 @@ rollout rl_SplineTools "样条线工具" (
             local pos = samples[i][1]
             local curT = samples[i][2]
             local scl = if samples[i].count >= 3 then samples[i][3] else 1.0
-            -- 切线几乎平行 Z 时换 Y 作为参考，避免叉乘退化
+            -- ���߼���ƽ�� Z ʱ�� Y ��Ϊ�ο����������˻�
             local up = if (abs (dot curT worldUp)) > 0.99 then [0,1,0] else worldUp
             local xA = normalize (cross up curT)
             local yA = normalize (cross curT xA)
@@ -1203,12 +1206,12 @@ rollout rl_SplineTools "样条线工具" (
         frames
     )
 
-    -- 从模型边界提取轮廓，返回 point2 数组 + 是否闭合（在模型自身局部坐标的 XY 平面）
+    -- ��ģ�ͱ߽���ȡ���������� point2 ���� + �Ƿ�պϣ���ģ�������ֲ������ XY ƽ�棩
     fn getCrossSectionFromMesh obj = (
         local result = #(#(), false)
         local tmpMesh = snapshotAsMesh obj
         if tmpMesh == undefined do return result
-        -- 收集开放边（只属于一个面的边）
+        -- �ռ����űߣ�ֻ����һ����ıߣ�
         local keys = #(); local counts = #(); local pairs = #()
         for fi = 1 to tmpMesh.numfaces do (
             local f = getFace tmpMesh fi
@@ -1231,7 +1234,7 @@ rollout rl_SplineTools "样条线工具" (
             if counts[i] == 1 do append boundary pairs[i]
         )
         if boundary.count < 2 do (delete tmpMesh; return result)
-        -- 把边连成有序环：从第一条边开始，按相连关系串
+        -- �ѱ��������򻷣��ӵ�һ���߿�ʼ����������ϵ��
         local used = #()
         for i = 1 to boundary.count do append used false
         local ordered = #()
@@ -1260,7 +1263,7 @@ rollout rl_SplineTools "样条线工具" (
         for vi in ordered do append pts3 (getVert tmpMesh vi)
         delete tmpMesh
         if pts3.count < 2 do return result
-        -- 计算 AABB，找最薄的轴作为法线方向，把另外两个轴用作截面 2D
+        -- ���� AABB�����������Ϊ���߷��򣬰������������������� 2D
         local mn = copy pts3[1]; local mx = copy pts3[1]
         for p in pts3 do (
             if p.x < mn.x do mn.x = p.x
@@ -1275,7 +1278,7 @@ rollout rl_SplineTools "样条线工具" (
         if ez <= ex and ez <= ey then ( axisU = 1; axisV = 2 )
         else if ey <= ex and ey <= ez then ( axisU = 1; axisV = 3 )
         else ( axisU = 2; axisV = 3 )
-        -- 计算质心（在选定的两轴上）以居中
+        -- �������ģ���ѡ���������ϣ��Ծ���
         local cu = 0.0; local cv = 0.0
         for p in pts3 do (
             local u = (if axisU == 1 then p.x else if axisU == 2 then p.y else p.z)
@@ -1293,12 +1296,12 @@ rollout rl_SplineTools "样条线工具" (
         result
     )
 
-    -- 从截面样条线提取顶点（投影到 XY 平面），返回 point2 数组 + 是否闭合
-    -- 截面以其自身坐标系的 XY 平面为准（Z 视作沿路径方向）
+    -- �ӽ�����������ȡ���㣨ͶӰ�� XY ƽ�棩������ point2 ���� + �Ƿ�պ�
+    -- ����������������ϵ�� XY ƽ��Ϊ׼��Z ������·������
     fn getCrossSection obj = (
         local result = #(#(), false)
         if not (isKindOf obj SplineShape or isKindOf obj line) do (
-            -- 模型对象走另一条路径：提取边界
+            -- ģ�Ͷ�������һ��·������ȡ�߽�
             if isKindOf obj GeometryClass do return (getCrossSectionFromMesh obj)
             return result
         )
@@ -1340,7 +1343,7 @@ rollout rl_SplineTools "样条线工具" (
         local nC = crossPts.count
         if nF < 2 or nC < 2 do return undefined
 
-        -- 顶点
+        -- ����
         local verts = #()
         for f = 1 to nF do (
             local fr = framesArr[f]
@@ -1352,7 +1355,7 @@ rollout rl_SplineTools "样条线工具" (
             )
         )
 
-        -- 身体三角面 + 记录每个 quad 的对角线顶点对（key set，O(E) 查找）
+        -- ���������� + ��¼ÿ�� quad �ĶԽ��߶���ԣ�key set��O(E) ���ң�
         local faces = #()
         local diagKeys = #{}
         local ringSegs = if crossClosed then nC else (nC - 1)
@@ -1375,7 +1378,7 @@ rollout rl_SplineTools "样条线工具" (
                     append faces [v00, v01, v11]
                     append faces [v00, v11, v10]
                 )
-                -- 把 (min,max) 编码成单个整数 key：a * (totalVerts+1) + b
+                -- �� (min,max) ����ɵ������� key��a * (totalVerts+1) + b
                 local da = v00; local db = v11
                 if da > db do (local t = da; da = db; db = t)
                 diagKeys[da * (totalVerts + 1) + db] = true
@@ -1385,7 +1388,7 @@ rollout rl_SplineTools "样条线工具" (
         local m = mesh vertices:verts faces:faces name:nodeName
         convertToPoly m
 
-        -- 删除对角线边，把三角对合并成 quad（O(E) 查找）
+        -- ɾ���Խ��߱ߣ������ǶԺϲ��� quad��O(E) ���ң�
         local diagEdgeSel = #{}
         local nE = polyop.getNumEdges m
         for e = 1 to nE do (
@@ -1399,7 +1402,7 @@ rollout rl_SplineTools "样条线工具" (
             m.EditablePoly.remove selLevel:#Edge
         )
 
-        -- 端盖 ngon：直接在 poly 上 createPolygon
+        -- �˸� ngon��ֱ���� poly �� createPolygon
         if capEnds and (not pathClosed) and crossClosed and nC >= 3 do (
             local startIdx = #()
             if flipNormals then (for c = 1 to nC do append startIdx c)
@@ -1416,8 +1419,8 @@ rollout rl_SplineTools "样条线工具" (
         m
     )
 
-    -- 合并位置重合（拐角处）的连续采样：用平分线作为切线（miter）
-    -- 同时计算 miter 横向缩放：1/cos(θ/2)，避免拐角处截面变窄
+    -- �ϲ�λ���غϣ��սǴ�����������������ƽ������Ϊ���ߣ�miter��
+    -- ͬʱ���� miter �������ţ�1/cos(��/2)������սǴ������խ
     fn mergeMiterSamples samples = (
         local merged = #()
         if samples.count == 0 do return merged
@@ -1444,32 +1447,32 @@ rollout rl_SplineTools "样条线工具" (
     fn doSweepBuild = (
         _51W_Telemetry.track "feature_used" props:#("feature", "SplineSweep")
         if pickedCross == undefined or pickedPath == undefined do (
-            messageBox "请先拾取截面与路径样条线。" title:"截面扫描生成"; return ()
+            messageBox "����ʰȡ������·�������ߡ�" title:"����ɨ������"; return ()
         )
         if not (isKindOf pickedCross SplineShape or isKindOf pickedCross line or isKindOf pickedCross GeometryClass) do (
-            messageBox "截面对象类型不支持。" title:"截面扫描生成"; return ()
+            messageBox "����������Ͳ�֧�֡�" title:"����ɨ������"; return ()
         )
         if not (isKindOf pickedPath SplineShape or isKindOf pickedPath line) do (
-            messageBox "路径对象不是样条线。" title:"截面扫描生成"; return ()
+            messageBox "·�������������ߡ�" title:"����ɨ������"; return ()
         )
 
         local stepsOverride = if spnSteps != undefined then (spnSteps.Value as integer) else 0
         local capEnds = if chkCap != undefined then (chkCap.Checked) else true
         local flipN = if chkFlip != undefined then (chkFlip.Checked) else false
 
-        -- 截面：在自身局部坐标取顶点
+        -- ���棺�������ֲ�����ȡ����
         local crossInfo = getCrossSection pickedCross
         local crossPts = crossInfo[1]
         local crossClosed = crossInfo[2]
         if crossPts.count < 2 do (
-            messageBox "截面顶点不足。" title:"截面扫描生成"; return ()
+            messageBox "���涥�㲻�㡣" title:"����ɨ������"; return ()
         )
 
-        -- 路径：遍历每条子样条线，每段生成一个 mesh，最后 attach 到一起
+        -- ·��������ÿ���������ߣ�ÿ������һ�� mesh����� attach ��һ��
         local pathObj = pickedPath
         local nSpl = numSplines pathObj
         local builtNodes = #()
-        undo "截面扫描生成" on (
+        undo "����ɨ������" on (
             for si = 1 to nSpl do (
                 local samples = samplePathSpline pathObj si stepsOverride
                 if samples.count < 2 do continue
@@ -1481,9 +1484,9 @@ rollout rl_SplineTools "样条线工具" (
                 if m != undefined do append builtNodes m
             )
             if builtNodes.count == 0 do (
-                messageBox "未生成任何模型。" title:"截面扫描生成"; return ()
+                messageBox "δ�����κ�ģ�͡�" title:"����ɨ������"; return ()
             )
-            -- 合并所有片段
+            -- �ϲ�����Ƭ��
             local main = builtNodes[1]
             for i = 2 to builtNodes.count do (
                 polyop.attach main builtNodes[i] deleteSourceNode:true
@@ -1499,16 +1502,16 @@ rollout rl_SplineTools "样条线工具" (
         local ui = _51W_Data.getUIColors()
         dnSplinePanel.BackColor = ui[1]
 
-        local gS = _51W_Data.makeGrp dnSplinePanel "样条线简化 | 选中样条线后点击" 0 0 464 65 ui
-        _51W_Data.makeLbl gS "角度阈值:" 14 28 60 20 ui
+        local gS = _51W_Data.makeGrp dnSplinePanel "�����߼� | ѡ�������ߺ���" 0 0 464 65 ui
+        _51W_Data.makeLbl gS "�Ƕ���ֵ:" 14 28 60 20 ui
         spnAngleCtrl = _51W_Data.makeSpn gS 0.1 45.0 5.0 1 0.5 76 26 60 22 ui
-        local b = _51W_Data.makeBtn gS "简化样条线" 150 24 200 28 ui
+        local b = _51W_Data.makeBtn gS "��������" 150 24 200 28 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_SplineTools.doSplineSimp()")
 
-        -- 第二行: 管道UV密度统一
-        local gU = _51W_Data.makeGrp dnSplinePanel "管道UV密度统一 | Sweep管道纹素密度一致化" 0 70 464 105 ui
+        -- �ڶ���: �ܵ�UV�ܶ�ͳһ
+        local gU = _51W_Data.makeGrp dnSplinePanel "�ܵ�UV�ܶ�ͳһ | Sweep�ܵ������ܶ�һ�»�" 0 70 464 105 ui
 
-        _51W_Data.makeLbl gU "缩放轴:" 14 22 50 18 ui
+        _51W_Data.makeLbl gU "������:" 14 22 50 18 ui
         rbDirV = dotNetObject "System.Windows.Forms.RadioButton"
         rbDirV.Text = "V"; rbDirV.Checked = true
         rbDirV.ForeColor = ui[2]; rbDirV.Font = ui[4]
@@ -1521,50 +1524,50 @@ rollout rl_SplineTools "样条线工具" (
         gU.controls.add rbDirU
 
         local lblTip = dotNetObject "System.Windows.Forms.Label"
-        lblTip.Text = "(V=沿路径方向, U=截面环绕方向)"
+        lblTip.Text = "(V=��·������, U=���滷�Ʒ���)"
         lblTip.ForeColor = (dotNetClass "System.Drawing.Color").FromArgb 160 160 160
         lblTip.Font = ui[4]
         lblTip.Bounds = dotNetObject "System.Drawing.Rectangle" 142 22 280 18
         gU.controls.add lblTip
-        _51W_Data.makeLbl gU "自定义密度 UV/cm:" 14 48 120 18 ui
+        _51W_Data.makeLbl gU "�Զ����ܶ� UV/cm:" 14 48 120 18 ui
         spnDensityCtrl = _51W_Data.makeSpn gU 0.00001 10000.0 0.01 2 0.001 138 46 74 22 ui
 
-        b = _51W_Data.makeBtn gU "预览信息" 14 76 200 24 ui
+        b = _51W_Data.makeBtn gU "Ԥ����Ϣ" 14 76 200 24 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_SplineTools.doUVPreview()")
-        b = _51W_Data.makeBtn gU "统一UV密度" 236 76 200 24 ui
+        b = _51W_Data.makeBtn gU "ͳһUV�ܶ�" 236 76 200 24 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_SplineTools.doUVNormalize()")
 
-        -- 第三组: 截面扫描生成
-        local gW = _51W_Data.makeGrp dnSplinePanel "截面扫描生成 | 截面 + 路径 → 智能Sweep（直线不分段）" 0 180 464 145 ui
-        local bC = _51W_Data.makeBtn gW "拾取截面..." 14 22 110 24 ui
+        -- ������: ����ɨ������
+        local gW = _51W_Data.makeGrp dnSplinePanel "����ɨ������ | ���� + ·�� �� ����Sweep��ֱ�߲��ֶΣ�" 0 180 464 145 ui
+        local bC = _51W_Data.makeBtn gW "ʰȡ����..." 14 22 110 24 ui
         dotNet.addEventHandler bC "Click" (fn c s e = execute "rl_SplineTools.doPickCross()")
-        lblCrossName = _51W_Data.makeLbl gW "(未拾取)" 130 26 320 18 ui
+        lblCrossName = _51W_Data.makeLbl gW "(δʰȡ)" 130 26 320 18 ui
 
-        local bP = _51W_Data.makeBtn gW "拾取路径..." 14 50 110 24 ui
+        local bP = _51W_Data.makeBtn gW "ʰȡ·��..." 14 50 110 24 ui
         dotNet.addEventHandler bP "Click" (fn c s e = execute "rl_SplineTools.doPickPath()")
-        lblPathName = _51W_Data.makeLbl gW "(未拾取)" 130 54 320 18 ui
+        lblPathName = _51W_Data.makeLbl gW "(δʰȡ)" 130 54 320 18 ui
 
-        _51W_Data.makeLbl gW "细分步数(0=用样条线steps):" 14 82 170 18 ui
+        _51W_Data.makeLbl gW "ϸ�ֲ���(0=��������steps):" 14 82 170 18 ui
         spnSteps = _51W_Data.makeSpn gW 0 64 0 0 1 186 80 56 22 ui
 
         chkCap = dotNetObject "System.Windows.Forms.CheckBox"
-        chkCap.Text = "端点封盖"; chkCap.Checked = true
+        chkCap.Text = "�˵���"; chkCap.Checked = true
         chkCap.ForeColor = ui[2]; chkCap.Font = ui[4]
         chkCap.Bounds = dotNetObject "System.Drawing.Rectangle" 14 110 80 20
         gW.controls.add chkCap
 
         chkFlip = dotNetObject "System.Windows.Forms.CheckBox"
-        chkFlip.Text = "翻转法线"; chkFlip.Checked = false
+        chkFlip.Text = "��ת����"; chkFlip.Checked = false
         chkFlip.ForeColor = ui[2]; chkFlip.Font = ui[4]
         chkFlip.Bounds = dotNetObject "System.Drawing.Rectangle" 100 110 80 20
         gW.controls.add chkFlip
 
-        local bGo = _51W_Data.makeBtn gW "生成模型" 250 108 200 26 ui
+        local bGo = _51W_Data.makeBtn gW "����ģ��" 250 108 200 26 ui
         dotNet.addEventHandler bGo "Click" (fn c s e = execute "rl_SplineTools.doSweepBuild()")
     )
 
     fn doPickCross = (
-        local o = pickObject prompt:"选择截面对象（样条线或模型）"
+        local o = pickObject prompt:"ѡ�������������߻�ģ�ͣ�"
         if o != undefined and isValidNode o do (
             pickedCross = o
             if lblCrossName != undefined do lblCrossName.Text = o.name
@@ -1572,7 +1575,7 @@ rollout rl_SplineTools "样条线工具" (
     )
 
     fn doPickPath = (
-        local o = pickObject prompt:"选择路径样条线" filter:(fn splineFilter obj = isKindOf obj SplineShape or isKindOf obj line)
+        local o = pickObject prompt:"ѡ��·��������" filter:(fn splineFilter obj = isKindOf obj SplineShape or isKindOf obj line)
         if o != undefined and isValidNode o do (
             pickedPath = o
             if lblPathName != undefined do lblPathName.Text = o.name
@@ -1582,7 +1585,7 @@ rollout rl_SplineTools "样条线工具" (
     fn doSplineSimp = (
         _51W_Telemetry.track "feature_used" props:#("feature", "SplineSimplify")
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择样条线对象。" title:"样条线简化"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�������߶���" title:"�����߼�"; return ())
         local angThresh = if spnAngleCtrl != undefined then (spnAngleCtrl.Value as float) else 5.0
         local totalRemoved = 0; local totalObj = 0
         undo "Spline Simplify" on (
@@ -1623,12 +1626,12 @@ rollout rl_SplineTools "样条线工具" (
                 if objRemoved > 0 do (totalRemoved += objRemoved; totalObj += 1)
             )
         )
-        messageBox (totalObj as string + " 个样条线共删除 " + totalRemoved as string + " 个节点。") title:"样条线简化"
+        messageBox (totalObj as string + " �������߹�ɾ�� " + totalRemoved as string + " ���ڵ㡣") title:"�����߼�"
     )
 
     fn doUVPreview = (
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择管道对象。" title:"UV密度预览"; return ())
+        if objs.count == 0 do (messageBox "����ѡ��ܵ�����" title:"UV�ܶ�Ԥ��"; return ())
         local msg = ""
         for obj in objs do (
             local lens = getSplineLengths obj
@@ -1640,31 +1643,31 @@ rollout rl_SplineTools "样条线工具" (
                     for j = 1 to lens.count do (if j > 1 do msg += ", "; msg += (formattedPrint lens[j] format:".2f"))
                     msg += "]\n"
                 )
-            ) else msg += obj.name + ":  [非样条线]\n"
+            ) else msg += obj.name + ":  [��������]\n"
         )
-        messageBox msg title:"管道样条线长度"
+        messageBox msg title:"�ܵ������߳���"
     )
 
     fn doUVNormalize = (
         _51W_Telemetry.track "feature_used" props:#("feature", "PipeUVNormalize")
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择管道对象。" title:"UV密度统一"; return ())
+        if objs.count == 0 do (messageBox "����ѡ��ܵ�����" title:"UV�ܶ�ͳһ"; return ())
 
-        -- 收集有效对象和各子样条线长度
+        -- �ռ���Ч����͸��������߳���
         local pipeData = #()
         for obj in objs do (
             local lens = getSplineLengths obj
             if lens.count > 0 do append pipeData #(obj, lens)
         )
-        if pipeData.count == 0 do (messageBox "未找到有效的样条线长度。" title:"UV密度统一"; return ())
+        if pipeData.count == 0 do (messageBox "δ�ҵ���Ч�������߳��ȡ�" title:"UV�ܶ�ͳһ"; return ())
 
-        -- 确定纹素密度
+        -- ȷ�������ܶ�
         local densVal = (spnDensityCtrl.Text as string) as float
         local density = densVal / getCmPerUnit()
 
-        local dirIdx = if rbDirV.Checked then 1 else 2  -- 1=V轴, 2=U轴
+        local dirIdx = if rbDirV.Checked then 1 else 2  -- 1=V��, 2=U��
 
-        undo "统一管道UV密度" on (
+        undo "ͳһ�ܵ�UV�ܶ�" on (
             local count = 0
             for d in pipeData do (
                 local obj = d[1]; local lens = d[2]
@@ -1676,7 +1679,7 @@ rollout rl_SplineTools "样条线工具" (
                     addModifier obj xf
                     if dirIdx == 1 then (xf.U_Tile = 1.0; xf.V_Tile = sf) else (xf.U_Tile = sf; xf.V_Tile = 1.0)
                 ) else (
-                    -- 多子样条线: snapshotAsMesh + Unwrap_UVW 逐元素缩放
+                    -- ����������: snapshotAsMesh + Unwrap_UVW ��Ԫ������
                     local theMesh = snapshotAsMesh obj
                     local numF = theMesh.numFaces
                     if numF > 0 and (meshop.getMapSupport theMesh 1) do (
@@ -1716,22 +1719,22 @@ rollout rl_SplineTools "样条线工具" (
                 )
                 count += 1
             )
-            messageBox (count as string + " 个管道对象已统一UV密度。") title:"UV密度统一"
+            messageBox (count as string + " ���ܵ�������ͳһUV�ܶȡ�") title:"UV�ܶ�ͳһ"
         )
     )
 )
 
 
--- 8. 批量导入\合并
-rollout rl_BatchImport "批量导入\\合并" (
-    label lbl_fl "文件列表:" align:#left
+-- 8. ��������\�ϲ�
+rollout rl_BatchImport "��������\\�ϲ�" (
+    label lbl_fl "�ļ��б�:" align:#left
     editText edt_list "" height:120 readOnly:true fieldWidth:460 align:#center
-    button btn_path "选择路径" width:80 height:24 align:#left offset:[10,0]
-    label lbl_type "导入\\合并文件类型:" align:#center offset:[0,-26]
+    button btn_path "ѡ��·��" width:80 height:24 align:#left offset:[10,0]
+    label lbl_type "����\\�ϲ��ļ�����:" align:#center offset:[0,-26]
     radioButtons rdo_type labels:#("OBJ","3DS","FBX","DWG","MAX","ALL") default:3 columns:6
-    checkbox chk_sub "包含子文件夹" checked:true align:#right offset:[-10,-24]
-    button btn_ref "刷新" width:50 height:22 align:#right offset:[-10,0]
-    button btn_go "开始导入" width:440 height:32 align:#center
+    checkbox chk_sub "�������ļ���" checked:true align:#right offset:[-10,-24]
+    button btn_ref "ˢ��" width:50 height:22 align:#right offset:[-10,0]
+    button btn_go "��ʼ����" width:440 height:32 align:#center
 
     fn refresh p = (
         _51W_Data.batchFileList = _51W_Data.collectFiles p (_51W_Data.getFilePattern rdo_type.state) chk_sub.checked
@@ -1741,17 +1744,17 @@ rollout rl_BatchImport "批量导入\\合并" (
         )
         local t = p + "\n"
         for f in _51W_Data.batchFileList do t += "  " + (filenameFromPath f) + "\n"
-        edt_list.text = t + "\n共 " + _51W_Data.batchFileList.count as string + " 个文件"
+        edt_list.text = t + "\n�� " + _51W_Data.batchFileList.count as string + " ���ļ�"
     )
 
-    on btn_path pressed do (local p = getSavePath caption:"选择导入文件夹"; if p != undefined do (_51W_Data.importBasePath = p; refresh p))
+    on btn_path pressed do (local p = getSavePath caption:"ѡ�����ļ���"; if p != undefined do (_51W_Data.importBasePath = p; refresh p))
     on btn_ref pressed do (if _51W_Data.importBasePath != "" do refresh _51W_Data.importBasePath)
 
     on btn_go pressed do (
         _51W_Telemetry.track "feature_used" props:#("feature", "BatchImport")
         local fl = _51W_Data.batchFileList
-        if fl.count == 0 do (messageBox "文件列表为空。" title:"批量导入"; return ())
-        if not (queryBox ("导入 " + fl.count as string + " 个文件？") title:"批量导入") do return ()
+        if fl.count == 0 do (messageBox "�ļ��б�Ϊ�ա�" title:"��������"; return ())
+        if not (queryBox ("���� " + fl.count as string + " ���ļ���") title:"��������") do return ()
         local ok = 0, ng = 0
         for f in fl do (
             try (
@@ -1759,9 +1762,9 @@ rollout rl_BatchImport "批量导入\\合并" (
                 else if toLower (getFilenameType f) == ".fbx" then importFile f #noPrompt using:FBXIMP
                 else importFile f #noPrompt
                 ok += 1
-            ) catch (ng += 1; format "导入失败: %\n" f)
+            ) catch (ng += 1; format "����ʧ��: %\n" f)
         )
-        messageBox ("成功: " + ok as string + "  失败: " + ng as string) title:"批量导入"
+        messageBox ("�ɹ�: " + ok as string + "  ʧ��: " + ng as string) title:"��������"
     )
 )
 
@@ -1783,11 +1786,11 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
     )
 
     fn getOrAddUnwrap obj ch:1 = (
-        -- 查找已有的 Unwrap_UVW
+        -- �������е� Unwrap_UVW
         local found = undefined
         for m in obj.modifiers where classOf m == Unwrap_UVW do (found = m; exit)
         if found != undefined then (
-            -- 检查当前修改面板是否已指向该修改器
+            -- ��鵱ǰ�޸�����Ƿ���ָ����޸���
             local cur = try (modPanel.getCurrentObject()) catch (undefined)
             if cur != found do (
                 max modify mode
@@ -1796,7 +1799,7 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
             if not (isUVEditorOpen()) do found.edit()
             found
         ) else (
-            -- 没有则添加新的
+            -- û���������µ�
             local uw = Unwrap_UVW()
             uw.setMapChannel ch
             addModifier obj uw
@@ -1811,23 +1814,23 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
         local ui = _51W_Data.getUIColors()
         dnUVPanel.BackColor = ui[1]
 
-        local gU = _51W_Data.makeGrp dnUVPanel "UV操作" 0 0 464 78 ui
-        local b = _51W_Data.makeBtn gU "一键平铺" 14 20 436 24 ui
+        local gU = _51W_Data.makeGrp dnUVPanel "UV����" 0 0 464 78 ui
+        local b = _51W_Data.makeBtn gU "һ��ƽ��" 14 20 436 24 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_UnwrapUVW.doFlatten()")
-        b = _51W_Data.makeBtn gU "全部占满一象限" 14 50 130 24 ui
+        b = _51W_Data.makeBtn gU "ȫ��ռ��һ����" 14 50 130 24 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_UnwrapUVW.doFillQuad()")
-        _51W_Data.makeLbl gU "间距:" 148 52 40 18 ui
+        _51W_Data.makeLbl gU "���:" 148 52 40 18 ui
         spnPaddingCtrl = _51W_Data.makeSpn gU 0.0 0.5 0.01 2 0.005 188 50 60 22 ui
-        b = _51W_Data.makeBtn gU "每个UV占满一象限" 260 50 190 24 ui
+        b = _51W_Data.makeBtn gU "ÿ��UVռ��һ����" 260 50 190 24 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_UnwrapUVW.doFillEach()")
     )
 
     fn doFlatten = (
         _51W_Telemetry.track "feature_used" props:#("feature", "UnwrapFlatten")
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"Unwrap UVW"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"Unwrap UVW"; return ())
         local c = 0
-        undo "一键平铺" on (
+        undo "һ��ƽ��" on (
             for obj in objs where superClassOf obj == GeometryClass do (
                 if selection.count != 1 or selection[1] != obj do select obj
                 local uw = getOrAddUnwrap obj ch:1
@@ -1844,9 +1847,9 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
     fn doFillQuad = (
         _51W_Telemetry.track "feature_used" props:#("feature", "UnwrapFillQuad")
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"Unwrap UVW"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"Unwrap UVW"; return ())
         local c = 0
-        undo "一键占满一象限" on (
+        undo "һ��ռ��һ����" on (
             for obj in objs where superClassOf obj == GeometryClass do (
                 if selection.count != 1 or selection[1] != obj do select obj
                 local uw = getOrAddUnwrap obj ch:1
@@ -1863,9 +1866,9 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
     fn doFillEach = (
         _51W_Telemetry.track "feature_used" props:#("feature", "UnwrapFillEach")
         local objs = selection as array
-        if objs.count == 0 do (messageBox "请先选择对象。" title:"Unwrap UVW"; return ())
+        if objs.count == 0 do (messageBox "����ѡ�����" title:"Unwrap UVW"; return ())
         local c = 0
-        undo "每个UV占满一象限" on (
+        undo "ÿ��UVռ��һ����" on (
             for obj in objs where superClassOf obj == GeometryClass do (
                 if selection.count != 1 or selection[1] != obj do select obj
                 if classOf obj.baseObject != Editable_Poly do convertToPoly obj
@@ -1875,7 +1878,7 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
                 if nf == 0 do continue
                 if not (polyop.getMapSupport obj 1) do continue
 
-                -- 用 polyop 检测 UV 岛（按 UV 连通性）
+                -- �� polyop ��� UV ������ UV ��ͨ�ԣ�
                 local numMV = polyop.getNumMapVerts obj 1
                 local maxMV = 0
                 for f = 1 to nf do (
@@ -1896,7 +1899,7 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
                     for v in mvf do vtxFaces[v][f] = true
                 )
 
-                -- 泛洪法查找 UV 岛（同时记录每岛的面集合）
+                -- ���鷨���� UV ����ͬʱ��¼ÿ�����漯�ϣ�
                 local visited = #{}
                 local islandFaces = #()
                 local islandVerts = #()
@@ -1918,7 +1921,7 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
                     append islandVerts vset
                 )
 
-                -- 通过 Unwrap_UVW 修改器修改 UV，避免 polyop.setMapVert 的限制
+                -- ͨ�� Unwrap_UVW �޸����޸� UV������ polyop.setMapVert ������
                 local uw = getOrAddUnwrap obj ch:1
                 for i = 1 to islandFaces.count do (
                     local verts = islandVerts[i]
@@ -1953,8 +1956,8 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
 )
 
 
--- 10. 其它工具
-rollout rl_OtherTools "其它工具" (
+-- 10. ��������
+rollout rl_OtherTools "��������" (
     dotNetControl dnOtherPanel "System.Windows.Forms.Panel" width:470 height:280 align:#center
 
     local rbModePoly, rbModeObj, rbModeSG, rbModeElem
@@ -1968,7 +1971,7 @@ rollout rl_OtherTools "其它工具" (
     )
 
     fn collectByGroup mode m faceCount = (
-        -- 返回 #(BitArray, ...) 分组（同组共享一个ID）
+        -- ���� #(BitArray, ...) ���飨ͬ�鹲��һ��ID��
         local groups = #()
         case mode of (
             #poly: ( for f = 1 to faceCount do (local ba = #{}; ba[f] = true; append groups ba) )
@@ -2076,7 +2079,7 @@ rollout rl_OtherTools "其它工具" (
 
     fn doRandMatID = (
         local sel = selection as array
-        if sel.count == 0 do ( messageBox "请先选择对象。" title:"随机材质ID"; return 0 )
+        if sel.count == 0 do ( messageBox "����ѡ�����" title:"�������ID"; return 0 )
         local mode = getMode()
         local n = spnIDCount.Value as integer
         if n < 1 do n = 1
@@ -2090,10 +2093,10 @@ rollout rl_OtherTools "其它工具" (
         ) catch (
             local err = getCurrentException()
             _51W_Telemetry.trackError "RandMatID" err
-            messageBox err title:"错误"
+            messageBox err title:"����"
             return 0
         )
-        messageBox ("已处理 " + cnt as string + " 个对象。") title:"随机材质ID"
+        messageBox ("�Ѵ��� " + cnt as string + " ������") title:"�������ID"
         cnt
     )
 
@@ -2101,52 +2104,52 @@ rollout rl_OtherTools "其它工具" (
         local ui = _51W_Data.getUIColors()
         dnOtherPanel.BackColor = ui[1]
 
-        -- 分组1: 随机材质ID
-        local g1 = _51W_Data.makeGrp dnOtherPanel "随机材质ID | Material IDs Random Generator" 0 0 464 95 ui
+        -- ����1: �������ID
+        local g1 = _51W_Data.makeGrp dnOtherPanel "�������ID | Material IDs Random Generator" 0 0 464 95 ui
 
-        _51W_Data.makeLbl g1 "模式:" 14 26 40 18 ui
+        _51W_Data.makeLbl g1 "ģʽ:" 14 26 40 18 ui
         rbModePoly = dotNetObject "System.Windows.Forms.RadioButton"
-        rbModePoly.Text = "多边形"; rbModePoly.Checked = true
+        rbModePoly.Text = "�����"; rbModePoly.Checked = true
         rbModePoly.ForeColor = ui[2]; rbModePoly.Font = ui[4]
         rbModePoly.Bounds = dotNetObject "System.Drawing.Rectangle" 56 24 70 20
         g1.controls.add rbModePoly
 
         rbModeObj = dotNetObject "System.Windows.Forms.RadioButton"
-        rbModeObj.Text = "对象"
+        rbModeObj.Text = "����"
         rbModeObj.ForeColor = ui[2]; rbModeObj.Font = ui[4]
         rbModeObj.Bounds = dotNetObject "System.Drawing.Rectangle" 132 24 60 20
         g1.controls.add rbModeObj
 
         rbModeSG = dotNetObject "System.Windows.Forms.RadioButton"
-        rbModeSG.Text = "平滑组"
+        rbModeSG.Text = "ƽ����"
         rbModeSG.ForeColor = ui[2]; rbModeSG.Font = ui[4]
         rbModeSG.Bounds = dotNetObject "System.Drawing.Rectangle" 198 24 70 20
         g1.controls.add rbModeSG
 
         rbModeElem = dotNetObject "System.Windows.Forms.RadioButton"
-        rbModeElem.Text = "元素"
+        rbModeElem.Text = "Ԫ��"
         rbModeElem.ForeColor = ui[2]; rbModeElem.Font = ui[4]
         rbModeElem.Bounds = dotNetObject "System.Drawing.Rectangle" 274 24 60 20
         g1.controls.add rbModeElem
 
-        _51W_Data.makeLbl g1 "子材质数:" 14 58 70 20 ui
+        _51W_Data.makeLbl g1 "�Ӳ�����:" 14 58 70 20 ui
         spnIDCount = _51W_Data.makeSpn g1 1 256 3 0 1 84 56 60 22 ui
 
-        local bGen = _51W_Data.makeBtn g1 "点击生成" 234 54 210 28 ui
-        dotNet.addEventHandler bGen "Click" (fn c s e = (try (rl_OtherTools.doRandMatID()) catch (messageBox (getCurrentException()) title:"错误")))
+        local bGen = _51W_Data.makeBtn g1 "�������" 234 54 210 28 ui
+        dotNet.addEventHandler bGen "Click" (fn c s e = (try (rl_OtherTools.doRandMatID()) catch (messageBox (getCurrentException()) title:"����")))
 
-        -- 分组2 / 分组3 占位
-        local g2 = _51W_Data.makeGrp dnOtherPanel "分组2 | 待添加" 0 100 464 65 ui
-        local g3 = _51W_Data.makeGrp dnOtherPanel "分组3 | 待添加" 0 170 464 65 ui
+        -- ����2 / ����3 ռλ
+        local g2 = _51W_Data.makeGrp dnOtherPanel "����2 | ������" 0 100 464 65 ui
+        local g3 = _51W_Data.makeGrp dnOtherPanel "����3 | ������" 0 170 464 65 ui
     )
 )
 
 
--- 11. 注意
-rollout rl_Note "注意" (label lbl "使用前请确保场景已保存。兼容Max 2025+, UE4/UE5。" align:#left)
+-- 11. ע��
+rollout rl_Note "ע��" (label lbl "ʹ��ǰ��ȷ�������ѱ��档����Max 2025+, UE4/UE5��" align:#left)
 
 
--- 创建浮动窗口
-_51W_Floater = newRolloutFloater "51WORLD虚幻资源自动转换工具 Version 3" 510 980
+-- ������������
+_51W_Floater = newRolloutFloater "51WORLD�����Դ�Զ�ת������ Version 3" 510 980
 for r in #(rl_BakeAO, rl_MatOptimize, rl_VrayConvert, rl_AutoName, rl_FBXExport, rl_CommonTools, rl_SplineTools, rl_UnwrapUVW, rl_BatchImport, rl_OtherTools, rl_Note) do
     addRollout r _51W_Floater rolledUp:true
