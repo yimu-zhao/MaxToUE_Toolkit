@@ -1,6 +1,8 @@
 /*
- * 51WORLD MaxToUE Toolkit  Version 3
- * 兼容: 3ds Max 2025+  |  支持: UE4 / UE5 FBX导出
+ * MaxToUE Toolkit  Version 3
+ * 推荐: 3ds Max 2022 及以上版本
+ * 备注: 2019/2020 可运行，但部分分组标题颜色显示异常（不影响功能）
+ * 支持: UE4 / UE5 FBX导出
  */
 try (closeRolloutFloater _51W_Floater) catch ()
 
@@ -1764,10 +1766,11 @@ rollout rl_BatchImport "批量导入\\合并" (
 )
 
 
--- 9. Unwrap UVW
-rollout rl_UnwrapUVW "Unwrap UVW" (
-    dotNetControl dnUVPanel "System.Windows.Forms.Panel" width:470 height:80 align:#center
+-- 9. UVW
+rollout rl_UnwrapUVW "UVW" (
+    dotNetControl dnUVPanel "System.Windows.Forms.Panel" width:470 height:148 align:#center
     local spnPaddingCtrl
+    local spnUVWSizeCtrl, chkSameMatCtrl
 
     fn isUVEditorOpen = (
         local hwnds = windows.getChildrenHWND 0
@@ -1818,7 +1821,56 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
         spnPaddingCtrl = _51W_Data.makeSpn gU 0.0 0.5 0.01 2 0.005 188 50 60 22 ui
         b = _51W_Data.makeBtn gU "每个UV占满一象限" 260 50 190 24 ui
         dotNet.addEventHandler b "Click" (fn c s e = execute "rl_UnwrapUVW.doFillEach()")
+
+        -- UVW Box 修改器（单行布局）
+        local gB = _51W_Data.makeGrp dnUVPanel "UVW Box" 0 88 464 50 ui
+        _51W_Data.makeLbl gB "尺寸:" 8 22 36 22 ui
+        spnUVWSizeCtrl = _51W_Data.makeSpn gB 1.0 1000000.0 200.0 1 100 46 20 100 22 ui
+        b = _51W_Data.makeBtn gB "应用 UVW Box" 152 20 110 24 ui
+        dotNet.addEventHandler b "Click" (fn c s e = execute "rl_UnwrapUVW.doApplyUVW()")
+        chkSameMatCtrl = dotNetObject "System.Windows.Forms.CheckBox"
+        chkSameMatCtrl.Text = "同时作用于同材质物体"
+        chkSameMatCtrl.ForeColor = ui[2]
+        chkSameMatCtrl.Font = ui[4]
+        chkSameMatCtrl.Bounds = dotNetObject "System.Drawing.Rectangle" 290 22 170 22
+        gB.controls.add chkSameMatCtrl
     )
+
+    fn collectUVWTargets sameMat = (
+        local result = #()
+        for o in selection where superClassOf o == GeometryClass do appendIfUnique result o
+        if sameMat do (
+            local matList = #()
+            for o in result where o.material != undefined do (
+                if (findItem matList o.material) == 0 do append matList o.material
+            )
+            for n in objects where superClassOf n == GeometryClass and n.material != undefined do (
+                if (findItem matList n.material) > 0 do appendIfUnique result n
+            )
+        )
+        result
+    )
+
+    fn doApplyUVW = (
+        _51W_Telemetry.track "feature_used" props:#("feature", "UVWMap")
+        local s = spnUVWSizeCtrl.Value
+        local objs = collectUVWTargets chkSameMatCtrl.Checked
+        if objs.count == 0 do (messageBox "请先选择对象。" title:"UVW Map"; return ())
+        undo "应用 UVW Box" on (
+            for obj in objs do (
+                local existing = undefined
+                for m in obj.modifiers while existing == undefined do (
+                    if classOf m == UVWMap do existing = m
+                )
+                if existing != undefined then (
+                    existing.length = s; existing.width = s; existing.height = s
+                ) else (
+                    addModifier obj (UVWMap maptype:4 length:s width:s height:s)
+                )
+            )
+        )
+    )
+
 
     fn doFlatten = (
         _51W_Telemetry.track "feature_used" props:#("feature", "UnwrapFlatten")
@@ -1953,10 +2005,11 @@ rollout rl_UnwrapUVW "Unwrap UVW" (
 
 -- 10. 其它工具
 rollout rl_OtherTools "其它工具" (
-    dotNetControl dnOtherPanel "System.Windows.Forms.Panel" width:470 height:280 align:#center
+    dotNetControl dnOtherPanel "System.Windows.Forms.Panel" width:470 height:220 align:#center
 
     local rbModePoly, rbModeObj, rbModeSG, rbModeElem
     local spnIDCount
+    local chkSepGroup, chkAttWeld
 
     fn getMode = (
         if rbModePoly.Checked then #poly
@@ -2095,6 +2148,191 @@ rollout rl_OtherTools "其它工具" (
         cnt
     )
 
+    -- 按材质ID分离（勾选"分离成组"则结果打组）
+    fn doSepMatID = (
+        _51W_Telemetry.track "feature_used" props:#("feature", "SepMatID")
+        local objs = selection as array
+        if objs.count == 0 do (messageBox "请先选择对象。" title:"按材质ID分离"; return ())
+        local doGroup = (if chkSepGroup.Checked then true else false)
+        undo "按材质ID分离" on (
+            for obj in objs do (
+                if superClassOf obj != GeometryClass do continue
+                if classOf obj.baseObject != Editable_Poly do convertToPoly obj
+                local nf = polyop.getNumFaces obj
+                if nf == 0 do continue
+                local ids = #{}
+                for f = 1 to nf do ids[polyop.getFaceMatID obj f] = true
+                local idArr = #()
+                for i in ids do append idArr i
+                if idArr.count <= 1 do continue
+                local newObjs = #(obj)
+                for i = 2 to idArr.count do (
+                    local cp = copy obj
+                    local del = #{}
+                    for f = 1 to nf do if (polyop.getFaceMatID obj f) != idArr[i] do del[f] = true
+                    polyop.deleteFaces cp del
+                    cp.name = obj.name + "_MatID" + idArr[i] as string
+                    append newObjs cp
+                )
+                local del0 = #{}
+                for f = 1 to nf do if (polyop.getFaceMatID obj f) != idArr[1] do del0[f] = true
+                polyop.deleteFaces obj del0
+                obj.name = obj.name + "_MatID" + idArr[1] as string
+                if doGroup do group newObjs
+            )
+        )
+    )
+
+    -- 按元素分离（勾选"分离成组"则结果打组）
+    fn doSepElem = (
+        _51W_Telemetry.track "feature_used" props:#("feature", "SepElem")
+        local objs = selection as array
+        if objs.count == 0 do (messageBox "请先选择对象。" title:"按元素分离"; return ())
+        local doGroup = (if chkSepGroup.Checked then true else false)
+        undo "按元素分离" on (
+            for obj in objs do (
+                if superClassOf obj != GeometryClass do continue
+                if classOf obj.baseObject != Editable_Poly do convertToPoly obj
+                local nf = polyop.getNumFaces obj
+                if nf == 0 do continue
+                local visited = #{}
+                local elems = #()
+                for f = 1 to nf do (
+                    if not visited[f] do (
+                        local elem = polyop.getElementsUsingFace obj #{f}
+                        visited += elem
+                        append elems elem
+                    )
+                )
+                if elems.count <= 1 do continue
+                local newObjs = #(obj)
+                for i = 2 to elems.count do (
+                    local cp = copy obj
+                    local del = #{}
+                    for f = 1 to nf do if not elems[i][f] do del[f] = true
+                    polyop.deleteFaces cp del
+                    cp.name = obj.name + "_" + i as string
+                    append newObjs cp
+                )
+                local del0 = #{}
+                for f = 1 to nf do if not elems[1][f] do del0[f] = true
+                polyop.deleteFaces obj del0
+                if doGroup do group newObjs
+            )
+        )
+    )
+
+    -- 按选择集合并（勾选"合并后焊接点"则焊接）
+    fn doAttachSel = (
+        _51W_Telemetry.track "feature_used" props:#("feature", "AttachSel")
+        local objs = selection as array
+        if objs.count < 2 do (messageBox "请至少选择 2 个对象。" title:"按选择集合并"; return ())
+        local doWeld = (if chkAttWeld.Checked then true else false)
+        undo "按选择集合并" on (
+            local base = objs[1]
+            if classOf base.baseObject != Editable_Poly do convertToPoly base
+            for i = 2 to objs.count do (
+                local o = objs[i]
+                if classOf o.baseObject != Editable_Poly do convertToPoly o
+                polyop.attach base o
+            )
+            if doWeld do (
+                base.weldThreshold = 0.01
+                polyop.weldVertsByThreshold base #{1..(polyop.getNumVerts base)}
+            )
+        )
+    )
+
+    -- 从单个材质获取漫反射贴图路径
+    fn getDiffuseMapFromMtl mtl = (
+        if mtl == undefined do return undefined
+        local tex = undefined
+        local props = #(#diffuseMap, #diffuse_map, #base_color_map, #texmap_diffuse, #texmap_base_color)
+        for p in props while tex == undefined do (
+            try (tex = getProperty mtl p) catch ()
+        )
+        if tex == undefined do return undefined
+        local fname = undefined
+        try (fname = tex.filename) catch ()
+        if fname == undefined do try (fname = tex.HDRIMapName) catch ()
+        if fname == undefined or fname == "" do return undefined
+        toLower fname
+    )
+
+    -- 获取物体实际使用的所有漫反射贴图（按面 MatID 取对应子材质），返回排序后用 | 拼接的字符串
+    fn getDiffuseMap obj = (
+        local mtl = obj.material
+        if mtl == undefined do return undefined
+        if classOf mtl != Multimaterial do return (getDiffuseMapFromMtl mtl)
+        -- Multimaterial：找出物体面上实际用到的 MatID
+        local usedIDs = #{}
+        try (
+            if classOf obj.baseObject == Editable_Poly then (
+                local nf = polyop.getNumFaces obj
+                for f = 1 to nf do usedIDs[polyop.getFaceMatID obj f] = true
+            ) else (
+                local m = snapshotAsMesh obj
+                local nf = m.numfaces
+                for f = 1 to nf do usedIDs[getFaceMatID m f] = true
+            )
+        ) catch ()
+        if usedIDs.numberSet == 0 do return undefined
+        local maps = #()
+        local subIDs = mtl.materialIDList
+        local subMats = mtl.materialList
+        for id in usedIDs do (
+            local subIdx = findItem subIDs id
+            if subIdx == 0 do (
+                -- materialIDList 没有匹配，按位置回退（id 索引到 materialList）
+                if id >= 1 and id <= subMats.count then subIdx = id else continue
+            )
+            local fname = getDiffuseMapFromMtl subMats[subIdx]
+            if fname != undefined do appendIfUnique maps fname
+        )
+        if maps.count == 0 do return undefined
+        sort maps
+        local key = ""
+        for i = 1 to maps.count do (
+            if i > 1 do key += "|"
+            key += maps[i]
+        )
+        key
+    )
+
+    -- 按漫射位图合并（同贴图的物体合并到一起，无贴图跳过）
+    fn doAttachOcc = (
+        _51W_Telemetry.track "feature_used" props:#("feature", "AttachByMap")
+        local objs = selection as array
+        if objs.count < 2 do (messageBox "请至少选择 2 个对象。" title:"按漫射位图合并"; return ())
+        local doWeld = (if chkAttWeld.Checked then true else false)
+        undo "按漫射位图合并" on (
+            local groups = #()
+            local keys = #()
+            local skipped = 0
+            for obj in objs do (
+                if superClassOf obj != GeometryClass do continue
+                local mapPath = getDiffuseMap obj
+                if mapPath == undefined do (skipped += 1; continue)
+                if classOf obj.baseObject != Editable_Poly do convertToPoly obj
+                local idx = findItem keys mapPath
+                if idx == 0 then (
+                    append keys mapPath
+                    append groups #(obj)
+                ) else (
+                    append groups[idx] obj
+                )
+            )
+            for grp in groups where grp.count > 1 do (
+                local base = grp[1]
+                for i = 2 to grp.count do polyop.attach base grp[i]
+                if doWeld do (
+                    base.weldThreshold = 0.01
+                    polyop.weldVertsByThreshold base #{1..(polyop.getNumVerts base)}
+                )
+            )
+        )
+    )
+
     on rl_OtherTools open do (
         local ui = _51W_Data.getUIColors()
         dnOtherPanel.BackColor = ui[1]
@@ -2133,9 +2371,27 @@ rollout rl_OtherTools "其它工具" (
         local bGen = _51W_Data.makeBtn g1 "点击生成" 234 54 210 28 ui
         dotNet.addEventHandler bGen "Click" (fn c s e = (try (rl_OtherTools.doRandMatID()) catch (messageBox (getCurrentException()) title:"错误")))
 
-        -- 分组2 / 分组3 占位
-        local g2 = _51W_Data.makeGrp dnOtherPanel "分组2 | 待添加" 0 100 464 65 ui
-        local g3 = _51W_Data.makeGrp dnOtherPanel "分组3 | 待添加" 0 170 464 65 ui
+        -- 分组2: 分离工具
+        local g2 = _51W_Data.makeGrp dnOtherPanel "分离工具" 0 100 228 110 ui
+        chkSepGroup = dotNetObject "System.Windows.Forms.CheckBox"
+        chkSepGroup.Text = "分离成组"; chkSepGroup.ForeColor = ui[2]; chkSepGroup.Font = ui[4]
+        chkSepGroup.Bounds = dotNetObject "System.Drawing.Rectangle" 10 22 200 22
+        g2.controls.add chkSepGroup
+        local bSepMat = _51W_Data.makeBtn g2 "按材质ID分离" 10 50 200 24 ui
+        dotNet.addEventHandler bSepMat "Click" (fn c s e = execute "rl_OtherTools.doSepMatID()")
+        local bSepElem = _51W_Data.makeBtn g2 "按元素分离" 10 78 200 24 ui
+        dotNet.addEventHandler bSepElem "Click" (fn c s e = execute "rl_OtherTools.doSepElem()")
+
+        -- 分组3: 合并工具
+        local g3 = _51W_Data.makeGrp dnOtherPanel "合并工具" 236 100 228 110 ui
+        chkAttWeld = dotNetObject "System.Windows.Forms.CheckBox"
+        chkAttWeld.Text = "合并后焊接点"; chkAttWeld.ForeColor = ui[2]; chkAttWeld.Font = ui[4]
+        chkAttWeld.Bounds = dotNetObject "System.Drawing.Rectangle" 10 22 200 22
+        g3.controls.add chkAttWeld
+        local bAttSel = _51W_Data.makeBtn g3 "按选择集合并" 10 50 200 24 ui
+        dotNet.addEventHandler bAttSel "Click" (fn c s e = execute "rl_OtherTools.doAttachSel()")
+        local bAttOcc = _51W_Data.makeBtn g3 "按漫射位图合并" 10 78 200 24 ui
+        dotNet.addEventHandler bAttOcc "Click" (fn c s e = execute "rl_OtherTools.doAttachOcc()")
     )
 )
 
@@ -2160,15 +2416,16 @@ rollout rl_Feedback "意见反馈" (
 )
 
 
--- 12. 更新内容
+-- 12. 更新内容（公示形式，无边框）
 rollout rl_Changelog "更新内容" (
-    edittext edt_log "" height:160 width:220 align:#center readOnly:true \
-        text:("【v3.0.0  2026-04-29】\r\n" + \
-              "新增：意见反馈模块\r\n" + \
-              "新增：自动检查更新\r\n" + \
-              "新增：随机材质ID 模块\r\n" + \
-              "新增：匿名使用统计\r\n" + \
-              "修复：自动更新中文乱码\r\n")
+    label lbl_compat "推荐 3ds Max 2022+  |  2019/2020 标题颜色异常但功能正常" align:#center
+    label lbl_sep    "────────────────────────────────────"          align:#center
+    label lbl_ver    "【v3.0.0   2026-04-29】"                       align:#center
+    label lbl_l1     "新增：意见反馈模块"                              align:#center
+    label lbl_l2     "新增：自动检查更新"                              align:#center
+    label lbl_l3     "新增：随机材质ID 模块"                           align:#center
+    label lbl_l4     "新增：匿名使用统计"                              align:#center
+    label lbl_l5     "修复：自动更新中文乱码"                          align:#center
 )
 
 
@@ -2178,3 +2435,9 @@ for r in #(rl_BakeAO, rl_MatOptimize, rl_VrayConvert, rl_AutoName, rl_FBXExport,
     addRollout r _51W_Floater rolledUp:true
 addRollout rl_Feedback _51W_Floater rolledUp:false
 addRollout rl_Changelog _51W_Floater rolledUp:false
+
+
+
+
+
+
