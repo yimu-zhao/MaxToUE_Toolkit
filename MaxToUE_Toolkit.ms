@@ -299,7 +299,7 @@ global _51W_Updater
     local _scriptPath = getSourceFileName()
 
     struct _51W_UpdaterStruct (
-        localVersion  = "3.0.0",
+        localVersion  = "3.0.1",
         rawBase       = "https://raw.githubusercontent.com/yimu-zhao/MaxToUE_Toolkit/main/",
         pat           = "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",
         iniPath       = (getDir #userScripts) + "\\_51W_Telemetry.ini",
@@ -2436,12 +2436,12 @@ rollout rl_Feedback "意见反馈" (
 rollout rl_Changelog "更新内容" (
     label lbl_compat "推荐 3ds Max 2022+  |  2019/2020 标题颜色异常但功能正常" align:#center
     label lbl_sep    "────────────────────────────────────"          align:#center
-    label lbl_ver    "【v3.0.0   2026-04-29】"                       align:#center
-    label lbl_l1     "新增：意见反馈模块"                              align:#center
-    label lbl_l2     "新增：自动检查更新"                              align:#center
-    label lbl_l3     "新增：随机材质ID 模块"                           align:#center
-    label lbl_l4     "新增：匿名使用统计"                              align:#center
-    label lbl_l5     "修复：自动更新中文乱码"                          align:#center
+    label lbl_ver    "【v3.0.1   2026-05-07】"                       align:#center
+    label lbl_l1     "新增：UVW Box / 分离合并工具"                    align:#center
+    label lbl_l2     "新增：按漫射位图合并支持多材质"                   align:#center
+    label lbl_l3     "优化：批量导出预览随选择实时刷新"                 align:#center
+    label lbl_l4     "优化：导出设置框批量只确认一次"                   align:#center
+    label lbl_l5     "优化：批量导入移至批量导出下方"                   align:#center
     label lbl_more   "完整历史 → GitHub / ChangeLOG.md"               align:#center
 )
 
