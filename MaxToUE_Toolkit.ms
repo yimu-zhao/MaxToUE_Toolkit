@@ -751,7 +751,12 @@ rollout rl_FBXExport "批量导出" (
         edt_list.text = txt
     )
 
-    on rl_FBXExport open do refreshPreview()
+    on rl_FBXExport open do (
+        refreshPreview()
+        callbacks.removeScripts id:#rl_FBXExport_SelChg
+        callbacks.addScript #selectionSetChanged "try(rl_FBXExport.refreshPreview())catch()" id:#rl_FBXExport_SelChg
+    )
+    on rl_FBXExport close do callbacks.removeScripts id:#rl_FBXExport_SelChg
     on btn_browse pressed do (local p = getSavePath caption:"选择FBX导出路径"; if p != undefined do (edt_path.text = p; _51W_Data.exportPath = p; refreshPreview()))
     on btn_clear pressed do (edt_path.text = ""; _51W_Data.exportPath = "")
     on btn_open pressed do (if edt_path.text != "" and doesFileExist edt_path.text do shellLaunch "explorer.exe" edt_path.text)
@@ -782,8 +787,10 @@ rollout rl_FBXExport "批量导出" (
                     local pfx = _51W_Data.meshPrefix
                     local fname = (if pfx != "" and not matchPattern obj.name pattern:(pfx + "_*") then (pfx + "_") else "") + obj.name
                     local fp = ep + "\\" + fname + ".fbx"
-                    if showDlg then exportFile fp selectedOnly:true using:FBXEXP
-                    else exportFile fp #noPrompt selectedOnly:true using:FBXEXP
+                    if showDlg then (
+                        exportFile fp selectedOnly:true using:FBXEXP
+                        showDlg = false  -- 批量导出仅在第一个模型时弹设置框，后续沿用
+                    ) else exportFile fp #noPrompt selectedOnly:true using:FBXEXP
                     if chk_origin.checked do (obj.pos = op; for u in ucx do u.pos += op)
                     n += 1
                 )
@@ -1840,12 +1847,15 @@ rollout rl_UnwrapUVW "UVW" (
         local result = #()
         for o in selection where superClassOf o == GeometryClass do appendIfUnique result o
         if sameMat do (
-            local matList = #()
+            -- 收集选中物体用到的所有材质
+            local matSet = #()
             for o in result where o.material != undefined do (
-                if (findItem matList o.material) == 0 do append matList o.material
+                if (findItem matSet o.material) == 0 do append matSet o.material
             )
-            for n in objects where superClassOf n == GeometryClass and n.material != undefined do (
-                if (findItem matList n.material) > 0 do appendIfUnique result n
+            -- 用 refs.dependents 反查每个材质的依赖物体（比遍历全场景快）
+            for mtl in matSet do (
+                local deps = refs.dependentNodes mtl
+                for n in deps where superClassOf n == GeometryClass do appendIfUnique result n
             )
         )
         result
@@ -2160,23 +2170,33 @@ rollout rl_OtherTools "其它工具" (
                 if classOf obj.baseObject != Editable_Poly do convertToPoly obj
                 local nf = polyop.getNumFaces obj
                 if nf == 0 do continue
-                local ids = #{}
-                for f = 1 to nf do ids[polyop.getFaceMatID obj f] = true
+                -- 缓存每个面的 MatID（避免后续重复查询）
+                local faceIDs = #()
+                faceIDs.count = nf
+                local idSet = #{}
+                for f = 1 to nf do (
+                    local id = polyop.getFaceMatID obj f
+                    faceIDs[f] = id
+                    idSet[id] = true
+                )
                 local idArr = #()
-                for i in ids do append idArr i
+                for i in idSet do append idArr i
                 if idArr.count <= 1 do continue
+                -- 预生成每个 ID 对应的面集合
+                local idFaces = #()
+                for i = 1 to idArr.count do (
+                    local ba = #{}
+                    for f = 1 to nf do if faceIDs[f] == idArr[i] do ba[f] = true
+                    append idFaces ba
+                )
                 local newObjs = #(obj)
                 for i = 2 to idArr.count do (
                     local cp = copy obj
-                    local del = #{}
-                    for f = 1 to nf do if (polyop.getFaceMatID obj f) != idArr[i] do del[f] = true
-                    polyop.deleteFaces cp del
+                    polyop.deleteFaces cp (#{1..nf} - idFaces[i])
                     cp.name = obj.name + "_MatID" + idArr[i] as string
                     append newObjs cp
                 )
-                local del0 = #{}
-                for f = 1 to nf do if (polyop.getFaceMatID obj f) != idArr[1] do del0[f] = true
-                polyop.deleteFaces obj del0
+                polyop.deleteFaces obj (#{1..nf} - idFaces[1])
                 obj.name = obj.name + "_MatID" + idArr[1] as string
                 if doGroup do group newObjs
             )
@@ -2208,15 +2228,11 @@ rollout rl_OtherTools "其它工具" (
                 local newObjs = #(obj)
                 for i = 2 to elems.count do (
                     local cp = copy obj
-                    local del = #{}
-                    for f = 1 to nf do if not elems[i][f] do del[f] = true
-                    polyop.deleteFaces cp del
+                    polyop.deleteFaces cp (#{1..nf} - elems[i])
                     cp.name = obj.name + "_" + i as string
                     append newObjs cp
                 )
-                local del0 = #{}
-                for f = 1 to nf do if not elems[1][f] do del0[f] = true
-                polyop.deleteFaces obj del0
+                polyop.deleteFaces obj (#{1..nf} - elems[1])
                 if doGroup do group newObjs
             )
         )
@@ -2426,15 +2442,17 @@ rollout rl_Changelog "更新内容" (
     label lbl_l3     "新增：随机材质ID 模块"                           align:#center
     label lbl_l4     "新增：匿名使用统计"                              align:#center
     label lbl_l5     "修复：自动更新中文乱码"                          align:#center
+    label lbl_more   "完整历史 → GitHub / ChangeLOG.md"               align:#center
 )
 
 
 -- 创建浮动窗口
 _51W_Floater = newRolloutFloater "MaxToUE Toolkit  Version 3" 510 980
-for r in #(rl_BakeAO, rl_MatOptimize, rl_VrayConvert, rl_AutoName, rl_FBXExport, rl_CommonTools, rl_SplineTools, rl_UnwrapUVW, rl_BatchImport, rl_OtherTools) do
+for r in #(rl_BakeAO, rl_MatOptimize, rl_VrayConvert, rl_AutoName, rl_FBXExport, rl_BatchImport, rl_CommonTools, rl_SplineTools, rl_UnwrapUVW, rl_OtherTools) do
     addRollout r _51W_Floater rolledUp:true
 addRollout rl_Feedback _51W_Floater rolledUp:false
 addRollout rl_Changelog _51W_Floater rolledUp:false
+
 
 
 
