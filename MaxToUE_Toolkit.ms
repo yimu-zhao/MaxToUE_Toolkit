@@ -184,7 +184,7 @@ struct _51W_TelemetryStruct (
     -- ★ 在这里填入你从 PostHog 拿到的 Project API Key (phc_ 开头) ★
     apiKey = "phc_y4SakH8nP3PwXrkZyBGjNF2dqDh67wgN8qnk2xYMzfom",
     apiHost = "https://us.i.posthog.com",
-    scriptVersion = "3.0.0",
+    scriptVersion = "3.0.2",
 
     iniPath = (getDir #userScripts) + "\\_51W_Telemetry.ini",
     enabled = true,
@@ -299,7 +299,7 @@ global _51W_Updater
     local _scriptPath = getSourceFileName()
 
     struct _51W_UpdaterStruct (
-        localVersion  = "3.0.1",
+        localVersion  = "3.0.2",
         rawBase       = "https://raw.githubusercontent.com/yimu-zhao/MaxToUE_Toolkit/main/",
         pat           = "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",
         iniPath       = (getDir #userScripts) + "\\_51W_Telemetry.ini",
@@ -745,9 +745,8 @@ rollout rl_FBXExport "批量导出" (
 
     fn refreshPreview = (
         local txt = if edt_path.text != "" then (edt_path.text + "\n") else ""
-        local pfx = _51W_Data.meshPrefix
         for obj in (selection as array) do
-            txt += "  " + (if pfx != "" and not matchPattern obj.name pattern:(pfx + "_*") then (pfx + "_") else "") + obj.name + ".fbx @ [" + obj.pos.x as string + "," + obj.pos.y as string + "," + obj.pos.z as string + "]\n"
+            txt += "  " + obj.name + ".fbx @ [" + obj.pos.x as string + "," + obj.pos.y as string + "," + obj.pos.z as string + "]\n"
         edt_list.text = txt
     )
 
@@ -784,9 +783,7 @@ rollout rl_FBXExport "批量导出" (
                     local ucx = if chk_ucx.checked then (for o in objects where matchPattern o.name pattern:("UCX_" + obj.name + "*") collect o) else #()
                     if chk_origin.checked do (obj.pos = [0,0,0]; for u in ucx do u.pos -= op)
                     select (join #(obj) ucx)
-                    local pfx = _51W_Data.meshPrefix
-                    local fname = (if pfx != "" and not matchPattern obj.name pattern:(pfx + "_*") then (pfx + "_") else "") + obj.name
-                    local fp = ep + "\\" + fname + ".fbx"
+                    local fp = ep + "\\" + obj.name + ".fbx"
                     if showDlg then (
                         exportFile fp selectedOnly:true using:FBXEXP
                         showDlg = false  -- 批量导出仅在第一个模型时弹设置框，后续沿用
@@ -2436,12 +2433,12 @@ rollout rl_Feedback "意见反馈" (
 rollout rl_Changelog "更新内容" (
     label lbl_compat "推荐 3ds Max 2022+  |  2019/2020 标题颜色异常但功能正常" align:#center
     label lbl_sep    "────────────────────────────────────"          align:#center
-    label lbl_ver    "【v3.0.1   2026-05-07】"                       align:#center
-    label lbl_l1     "新增：UVW Box / 分离合并工具"                    align:#center
-    label lbl_l2     "新增：按漫射位图合并支持多材质"                   align:#center
-    label lbl_l3     "优化：批量导出预览随选择实时刷新"                 align:#center
-    label lbl_l4     "优化：导出设置框批量只确认一次"                   align:#center
-    label lbl_l5     "优化：批量导入移至批量导出下方"                   align:#center
+    label lbl_ver    "【v3.0.2   2026-05-08】"                       align:#center
+    label lbl_l1     "修复：批量导出不再强制添加 SM_ 前缀"             align:#center
+    label lbl_l2     "修复：导出预览框名称与实际导出文件名保持一致"     align:#center
+    label lbl_l3     "说明：如需前缀请使用上方“一键自动命名”重命名"    align:#center
+    label lbl_l4     ""                                              align:#center
+    label lbl_l5     ""                                              align:#center
     label lbl_more   "完整历史 → GitHub / ChangeLOG.md"               align:#center
 )
 
