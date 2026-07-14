@@ -261,9 +261,14 @@ global _51W_Updater
 
 -- 版本号异步返回后的处理（在主线程回调中执行，不阻塞脚本加载）
 fn _51W_OnUpdateVersion sender args = (
+    local manual = _51W_Updater.manualCheck
+    _51W_Updater.manualCheck = false
     try (
-        if args.Cancelled do return ()
-        if args.Error != undefined do return ()   -- 网络失败静默退出
+        if args.Cancelled do (if manual do messageBox "检查更新已取消。" title:"检查更新"; return ())
+        if args.Error != undefined do (
+            if manual do messageBox "检查更新失败，请检查网络后重试。" title:"检查更新"
+            return ()   -- 自动检查时网络失败静默退出
+        )
         local remoteVer = trimRight (args.Result as string)
         if _51W_Updater.isNewer remoteVer do (
             local ans = queryBox ("发现新版本 " + remoteVer + "（当前 " + _51W_Updater.localVersion + "）\n\n是否立即下载更新？\n下载完成后请重新运行脚本。") \
@@ -277,8 +282,13 @@ fn _51W_OnUpdateVersion sender args = (
                     messageBox "下载失败，请检查网络后重试。" title:"更新失败"
                 )
             )
+            return ()
         )
-    ) catch ()
+        -- 已是最新版：仅手动检查时提示，自动检查静默
+        if manual do messageBox ("当前已是最新版本 v" + _51W_Updater.localVersion + "。") title:"检查更新"
+    ) catch (
+        if manual do messageBox "检查更新失败，请检查网络后重试。" title:"检查更新"
+    )
 )
 
 (
@@ -291,6 +301,7 @@ fn _51W_OnUpdateVersion sender args = (
         iniPath       = (getDir #userScripts) + "\\_51W_Telemetry.ini",
         scriptPath    = "",
         wcHold        = undefined,
+        manualCheck   = false,
 
         fn isNewer remoteVer = (
             try (
@@ -329,11 +340,16 @@ fn _51W_OnUpdateVersion sender args = (
             ) catch (undefined)
         ),
 
-        fn checkAsync = (
+        fn checkAsync manual:false = (
             try (
-                if scriptPath == "" or not (doesFileExist scriptPath) do return undefined
-                if (getINISetting iniPath "Updater" "AutoUpdate") == "false" do return undefined
+                if scriptPath == "" or not (doesFileExist scriptPath) do (
+                    if manual do messageBox "无法定位脚本文件，无法更新。" title:"检查更新"
+                    return undefined
+                )
+                -- 自动检查遵循 INI 开关；手动检查（用户主动点击）忽略开关强制查
+                if not manual and (getINISetting iniPath "Updater" "AutoUpdate") == "false" do return undefined
 
+                manualCheck = manual
                 -- 异步拉取版本号，回调在主线程执行，不阻塞脚本加载/UI
                 local wc = dotNetObject "System.Net.WebClient"
                 wc.Encoding = (dotNetClass "System.Text.Encoding").UTF8
@@ -342,7 +358,9 @@ fn _51W_OnUpdateVersion sender args = (
                 dotNet.addEventHandler wc "DownloadStringCompleted" _51W_OnUpdateVersion
                 wcHold = wc   -- 持有引用，避免异步完成前被 GC
                 wc.DownloadStringAsync (dotNetObject "System.Uri" (rawBase + "version.txt"))
-            ) catch ()
+            ) catch (
+                if manual do messageBox "检查更新失败，请检查网络后重试。" title:"检查更新"
+            )
         )
     )
 
@@ -2755,6 +2773,11 @@ rollout rl_Changelog "更新内容" (
     label lbl_l5     "修复：多选导出点『否』未中断、异常场景残留"       align:#center
     label lbl_l6     ""                                              align:#center
     label lbl_more   "完整历史 → GitHub / ChangeLOG.md"               align:#center
+    button btn_check_update "🔄 检查更新" width:220 height:24 align:#center
+
+    on btn_check_update pressed do (
+        try (_51W_Updater.checkAsync manual:true) catch (messageBox (getCurrentException()) title:"检查更新")
+    )
 )
 
 
