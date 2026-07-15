@@ -108,7 +108,7 @@ struct _51W_TelemetryStruct (
     -- ★ 在这里填入你从 PostHog 拿到的 Project API Key (phc_ 开头) ★
     apiKey = "phc_y4SakH8nP3PwXrkZyBGjNF2dqDh67wgN8qnk2xYMzfom",
     apiHost = "https://us.i.posthog.com",
-    scriptVersion = "3.1.1",
+    scriptVersion = "3.1.2",
 
     iniPath = (getDir #userScripts) + "\\_51W_Telemetry.ini",
     enabled = true,
@@ -288,7 +288,7 @@ fn _51W_OnUpdateVersion sender args = (
     local _scriptPath = getSourceFileName()
 
     struct _51W_UpdaterStruct (
-        localVersion  = "3.1.1",
+        localVersion  = "3.1.2",
         rawBase       = "https://raw.githubusercontent.com/yimu-zhao/MaxToUE_Toolkit/main/",
         pat           = "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",
         iniPath       = (getDir #userScripts) + "\\_51W_Telemetry.ini",
@@ -2820,12 +2820,12 @@ rollout rl_Feedback "意见反馈" (
 rollout rl_Changelog "更新内容" (
     label lbl_compat "推荐 3ds Max 2022+  |  2019/2020 标题颜色异常但功能正常" align:#center
     label lbl_sep    "────────────────────────────────────"          align:#center
-    label lbl_ver    "【v3.1.1   2026-07-14】"                       align:#center
-    label lbl_l1     "新增：优化工具大类（移除废点/焊接/ProOptimizer减面）" align:#center
-    label lbl_l2     "新增：导出路径记忆（自动识别场景目录，改后随场景保存）" align:#center
-    label lbl_l3     "新增：烘焙AO 可选 UV 通道（默认第 2 套 Lightmap）"    align:#center
-    label lbl_l4     "优化：批量导出提速（导出中静默、成功不打扰）"     align:#center
-    label lbl_l5     "修复：多选导出点『否』未中断、异常场景残留"       align:#center
+    label lbl_ver    "【v3.1.2   2026-07-15】"                       align:#center
+    label lbl_l1     "修复：UVW Box 面选——面子层级只选中部分面时仅对选中面生效" align:#center
+    label lbl_l2     "" align:#center
+    label lbl_l3     "【v3.1.1】新增优化工具大类 / 导出路径记忆 / 烘焙AO 可选 UV"    align:#center
+    label lbl_l4     "【v3.1.1】批量导出提速、多选导出稳定性修复"     align:#center
+    label lbl_l5     ""       align:#center
     label lbl_l6     ""                                              align:#center
     label lbl_more   "完整历史 → GitHub / ChangeLOG.md"               align:#center
     button btn_update "已是最新版本" width:220 height:24 align:#center enabled:false
