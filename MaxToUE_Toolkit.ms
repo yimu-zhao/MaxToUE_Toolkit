@@ -260,35 +260,28 @@ _51W_Telemetry.track "script_loaded"
 global _51W_Updater
 
 -- 版本号异步返回后的处理（在主线程回调中执行，不阻塞脚本加载）
+-- 检测到新版：刷新按钮状态 + 弹一次明显提示（无新版时不弹，静默）
 fn _51W_OnUpdateVersion sender args = (
-    local manual = _51W_Updater.manualCheck
-    _51W_Updater.manualCheck = false
     try (
-        if args.Cancelled do (if manual do messageBox "检查更新已取消。" title:"检查更新"; return ())
-        if args.Error != undefined do (
-            if manual do messageBox "检查更新失败，请检查网络后重试。" title:"检查更新"
-            return ()   -- 自动检查时网络失败静默退出
-        )
+        if args.Cancelled or args.Error != undefined do return ()   -- 网络失败静默退出
         local remoteVer = trimRight (args.Result as string)
         if _51W_Updater.isNewer remoteVer do (
-            local ans = queryBox ("发现新版本 " + remoteVer + "（当前 " + _51W_Updater.localVersion + "）\n\n是否立即下载更新？\n下载完成后请重新运行脚本。") \
-                title:"MaxToUE Toolkit 有更新"
-            if ans do (
-                local bytes = _51W_Updater.fetchBytes (_51W_Updater.rawBase + "MaxToUE_Toolkit.ms") timeoutMs:15000
-                if bytes != undefined then (
-                    (dotNetClass "System.IO.File").WriteAllBytes _51W_Updater.scriptPath bytes
-                    messageBox "更新完成！\n请重新运行脚本以加载新版本。" title:"更新成功"
-                ) else (
-                    messageBox "下载失败，请检查网络后重试。" title:"更新失败"
-                )
-            )
-            return ()
+            _51W_Updater.remoteVersion = remoteVer
+            _51W_Updater.updateAvailable = true
         )
-        -- 已是最新版：仅手动检查时提示，自动检查静默
-        if manual do messageBox ("当前已是最新版本 v" + _51W_Updater.localVersion + "。") title:"检查更新"
-    ) catch (
-        if manual do messageBox "检查更新失败，请检查网络后重试。" title:"检查更新"
-    )
+        -- 刷新更新按钮显示（若面板已创建）
+        try (rl_Changelog.refreshUpdateBtn()) catch ()
+        -- 有新版时弹一次明显提示，让用户直接选择更新/稍后（只弹一次）
+        if _51W_Updater.updateAvailable and not _51W_Updater.promptShown do (
+            _51W_Updater.promptShown = true
+            if (queryBox ("发现新版本 " + _51W_Updater.remoteVersion + "\n当前版本 " + _51W_Updater.localVersion + \
+                "\n\n是否立即更新？\n（也可稍后在『更新内容』面板底部点击更新）") title:"MaxToUE Toolkit 有更新") do (
+                try (
+                    if _51W_Updater.doDownload confirm:false do (try (rl_Changelog.refreshUpdateBtn()) catch ())
+                ) catch ()
+            )
+        )
+    ) catch ()
 )
 
 (
@@ -301,7 +294,9 @@ fn _51W_OnUpdateVersion sender args = (
         iniPath       = (getDir #userScripts) + "\\_51W_Telemetry.ini",
         scriptPath    = "",
         wcHold        = undefined,
-        manualCheck   = false,
+        updateAvailable = false,
+        remoteVersion = "",
+        promptShown   = false,
 
         fn isNewer remoteVer = (
             try (
@@ -340,16 +335,11 @@ fn _51W_OnUpdateVersion sender args = (
             ) catch (undefined)
         ),
 
-        fn checkAsync manual:false = (
+        fn checkAsync = (
             try (
-                if scriptPath == "" or not (doesFileExist scriptPath) do (
-                    if manual do messageBox "无法定位脚本文件，无法更新。" title:"检查更新"
-                    return undefined
-                )
-                -- 自动检查遵循 INI 开关；手动检查（用户主动点击）忽略开关强制查
-                if not manual and (getINISetting iniPath "Updater" "AutoUpdate") == "false" do return undefined
+                if scriptPath == "" or not (doesFileExist scriptPath) do return undefined
+                if (getINISetting iniPath "Updater" "AutoUpdate") == "false" do return undefined
 
-                manualCheck = manual
                 -- 异步拉取版本号，回调在主线程执行，不阻塞脚本加载/UI
                 local wc = dotNetObject "System.Net.WebClient"
                 wc.Encoding = (dotNetClass "System.Text.Encoding").UTF8
@@ -358,8 +348,23 @@ fn _51W_OnUpdateVersion sender args = (
                 dotNet.addEventHandler wc "DownloadStringCompleted" _51W_OnUpdateVersion
                 wcHold = wc   -- 持有引用，避免异步完成前被 GC
                 wc.DownloadStringAsync (dotNetObject "System.Uri" (rawBase + "version.txt"))
-            ) catch (
-                if manual do messageBox "检查更新失败，请检查网络后重试。" title:"检查更新"
+            ) catch ()
+        ),
+
+        -- 用户点击「点击更新」时触发：同步下载并覆盖脚本文件
+        -- confirm:true 时先弹确认框；confirm:false 用于已确认过的场景（如启动提示框已选是）
+        fn doDownload confirm:true = (
+            if not updateAvailable do return false
+            if confirm and not (queryBox ("发现新版本 " + remoteVersion + "（当前 " + localVersion + "）\n\n是否立即下载更新？\n下载完成后请重新运行脚本。") \
+                title:"MaxToUE Toolkit 有更新") do return false
+            local bytes = fetchBytes (rawBase + "MaxToUE_Toolkit.ms") timeoutMs:15000
+            if bytes != undefined then (
+                (dotNetClass "System.IO.File").WriteAllBytes scriptPath bytes
+                messageBox "更新完成！\n请重新运行脚本以加载新版本。" title:"更新成功"
+                true
+            ) else (
+                messageBox "下载失败，请检查网络后重试。" title:"更新失败"
+                false
             )
         )
     )
@@ -2178,6 +2183,49 @@ rollout rl_UnwrapUVW "UVW" width:464 (
         result
     )
 
+    -- 返回 #(类型, 面选BitArray)；无选中面返回 undefined
+    fn getObjFaceSel obj = (
+        local sel = undefined
+        try (
+            local bo = obj.baseObject
+            if isKindOf bo Editable_Poly then (
+                local fs = polyop.getFaceSelection obj
+                if fs.numberSet > 0 do sel = #(#poly, fs)
+            ) else if isKindOf bo Editable_Mesh then (
+                local fs = getFaceSelection obj
+                if fs.numberSet > 0 do sel = #(#mesh, fs)
+            )
+        ) catch ()
+        sel
+    )
+
+    -- 在物体顶部加"仅作用选中面"的 UVWMap（用 addModToSelection 尊重面选）
+    fn addUVWToFaceSel obj faceInfo s = (
+        local kind = faceInfo[1]
+        local fs = faceInfo[2]
+        -- 顶部已是 UVWMap 则复用（改参数），避免重复叠加
+        if obj.modifiers.count > 0 and classOf obj.modifiers[1] == UVWMap then (
+            local ex = obj.modifiers[1]
+            ex.maptype = 4
+            try (ex.realWorldMapSize = false) catch ()
+            ex.length = s
+            ex.width = s
+            ex.height = s
+        ) else (
+            select obj
+            max modify mode
+            modPanel.setCurrentObject obj.baseObject
+            -- 还原面选到基础物体（select/collect 可能已清掉）
+            if kind == #poly then
+                polyop.setFaceSelection obj fs
+            else
+                setFaceSelection obj fs
+            local u = UVWMap maptype:4 length:s width:s height:s
+            try (u.realWorldMapSize = false) catch ()
+            modPanel.addModToSelection u ui:on
+        )
+    )
+
     fn doApplyUVWCore sizeVal sameMat = (
         _51W_Telemetry.track "feature_used" props:#("feature", "UVWMap")
         local s = sizeVal
@@ -2189,20 +2237,27 @@ rollout rl_UnwrapUVW "UVW" width:464 (
         undo "应用 UVW Box" on (
             for obj in objs where superClassOf obj == GeometryClass do (
                 try (
-                    local existing = undefined
-                    for m in obj.modifiers while existing == undefined do (
-                        if classOf m == UVWMap do existing = m
-                    )
-                    if existing != undefined then (
-                        existing.maptype = 4
-                        try (existing.realWorldMapSize = false) catch ()
-                        existing.length = s
-                        existing.width = s
-                        existing.height = s
+                    local faceInfo = getObjFaceSel obj
+                    if faceInfo != undefined then (
+                        -- 有面级选择：只作用选中面
+                        addUVWToFaceSel obj faceInfo s
                     ) else (
-                        local u = UVWMap maptype:4 length:s width:s height:s
-                        try (u.realWorldMapSize = false) catch ()
-                        addModifier obj u
+                        -- 无面级选择：整体应用（复用已有 UVWMap）
+                        local existing = undefined
+                        for m in obj.modifiers while existing == undefined do (
+                            if classOf m == UVWMap do existing = m
+                        )
+                        if existing != undefined then (
+                            existing.maptype = 4
+                            try (existing.realWorldMapSize = false) catch ()
+                            existing.length = s
+                            existing.width = s
+                            existing.height = s
+                        ) else (
+                            local u = UVWMap maptype:4 length:s width:s height:s
+                            try (u.realWorldMapSize = false) catch ()
+                            addModifier obj u
+                        )
                     )
                     applied += 1
                 ) catch (
@@ -2773,10 +2828,25 @@ rollout rl_Changelog "更新内容" (
     label lbl_l5     "修复：多选导出点『否』未中断、异常场景残留"       align:#center
     label lbl_l6     ""                                              align:#center
     label lbl_more   "完整历史 → GitHub / ChangeLOG.md"               align:#center
-    button btn_check_update "🔄 检查更新" width:220 height:24 align:#center
+    button btn_update "已是最新版本" width:220 height:24 align:#center enabled:false
 
-    on btn_check_update pressed do (
-        try (_51W_Updater.checkAsync manual:true) catch (messageBox (getCurrentException()) title:"检查更新")
+    -- 根据自动检测结果刷新按钮：有新版则高亮可点，否则显示已是最新
+    fn refreshUpdateBtn = (
+        if _51W_Updater.updateAvailable then (
+            btn_update.text = "🔺 发现新版 v" + _51W_Updater.remoteVersion + "，点击更新"
+            btn_update.enabled = true
+        ) else (
+            btn_update.text = "已是最新版本 v" + _51W_Updater.localVersion
+            btn_update.enabled = false
+        )
+    )
+
+    on rl_Changelog open do refreshUpdateBtn()
+
+    on btn_update pressed do (
+        try (
+            if _51W_Updater.doDownload() do (btn_update.enabled = false)
+        ) catch (messageBox (getCurrentException()) title:"更新")
     )
 )
 
