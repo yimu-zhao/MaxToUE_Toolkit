@@ -108,7 +108,7 @@ struct _51W_TelemetryStruct (
     -- ★ 在这里填入你从 PostHog 拿到的 Project API Key (phc_ 开头) ★
     apiKey = "phc_y4SakH8nP3PwXrkZyBGjNF2dqDh67wgN8qnk2xYMzfom",
     apiHost = "https://us.i.posthog.com",
-    scriptVersion = "3.1.3.2",
+    scriptVersion = "3.1.3.3",
 
     iniPath = (getDir #userScripts) + "\\_51W_Telemetry.ini",
     enabled = true,
@@ -288,7 +288,7 @@ fn _51W_OnUpdateVersion sender args = (
     local _scriptPath = getSourceFileName()
 
     struct _51W_UpdaterStruct (
-        localVersion  = "3.1.3.2",
+        localVersion  = "3.1.3.3",
         rawBase       = "https://raw.githubusercontent.com/yimu-zhao/MaxToUE_Toolkit/main/",
         pat           = "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",
         iniPath       = (getDir #userScripts) + "\\_51W_Telemetry.ini",
@@ -311,6 +311,17 @@ fn _51W_OnUpdateVersion sender args = (
                 )
                 false
             ) catch false
+        ),
+
+        fn isDirWritable dir = (
+            local probe = dir + "\\.w51_" + ((random 100000 999999) as string) + ".tmp"
+            try (
+                local f = createFile probe
+                if f == undefined do return false
+                close f
+                deleteFile probe
+                true
+            ) catch (false)
         ),
 
         fn fetchToFile url destPath timeoutMs:15000 = (
@@ -345,6 +356,14 @@ fn _51W_OnUpdateVersion sender args = (
             if not updateAvailable do return false
             if confirm and not (queryBox ("发现新版本 " + remoteVersion + "（当前 " + localVersion + "）\n\n是否立即下载更新？\n下载完成后请重新运行脚本。") \
                 title:"MaxToUE Toolkit 有更新") do return false
+            -- 更新需覆盖脚本自身，先确认所在目录可写（Program Files 等受保护目录会失败）
+            local scriptDir = getFilenamePath scriptPath
+            if not (isDirWritable scriptDir) do (
+                messageBox ("更新失败：脚本所在目录没有写入权限，无法自动更新。\n\n当前位置：\n" + scriptDir + \
+                    "\n\n请将脚本移动到普通目录（例如 文档 或 桌面 下的文件夹），\n避免放在 C:\\Program Files 内，然后重新加载脚本即可正常更新。") \
+                    title:"更新失败 · 需移动位置"
+                return false
+            )
             local tmpPath = scriptPath + ".download.tmp"
             local ok = (fetchToFile (rawBase + "MaxToUE_Toolkit.ms") tmpPath timeoutMs:15000)
             if ok and (doesFileExist tmpPath) and ((getFileSize tmpPath) > 0) then (
@@ -2817,8 +2836,8 @@ rollout rl_Feedback "意见反馈" (
 rollout rl_Changelog "更新内容" (
     label lbl_compat "推荐 3ds Max 2022+  |  2019/2020 标题颜色异常但功能正常" align:#center
     label lbl_sep    "────────────────────────────────────"          align:#center
-    label lbl_ver    "【v3.1.3.2   2026-07-16】"                       align:#center
-    label lbl_l1     "test2" align:#center
+    label lbl_ver    "【v3.1.3.3   2026-07-16】"                       align:#center
+    label lbl_l1     "test3" align:#center
     label lbl_l2     "【v3.1.2】UVW Box 面选：只对选中面生效，重复点击不叠加" align:#center
     label lbl_l3     "【v3.1.1】新增优化工具大类 / 导出路径记忆 / 烘焙AO 可选 UV"    align:#center
     label lbl_l4     "【v3.1.1】批量导出提速、多选导出稳定性修复"     align:#center
