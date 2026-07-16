@@ -108,7 +108,7 @@ struct _51W_TelemetryStruct (
     -- ★ 在这里填入你从 PostHog 拿到的 Project API Key (phc_ 开头) ★
     apiKey = "phc_y4SakH8nP3PwXrkZyBGjNF2dqDh67wgN8qnk2xYMzfom",
     apiHost = "https://us.i.posthog.com",
-    scriptVersion = "3.1.3.3",
+    scriptVersion = "3.1.4",
 
     iniPath = (getDir #userScripts) + "\\_51W_Telemetry.ini",
     enabled = true,
@@ -247,6 +247,27 @@ struct _51W_TelemetryStruct (
 
     fn trackError feature errMsg = (
         track "error_occurred" props:#("feature", feature, "error", errMsg)
+    ),
+
+    -- 意见反馈：不受 enabled 开关限制，同步发送并返回真实成败（供 UI 据实提示）
+    fn sendFeedback txt = (
+        if apiKey == "phc_REPLACE_ME" do return false
+        if distinctId == "" or sessionId == "" do ensureUser()
+        try (
+            local body = "{\"api_key\":\"" + apiKey + "\""
+            body += ",\"event\":\"feedback_submitted\""
+            body += ",\"distinct_id\":\"" + distinctId + "\""
+            body += ",\"properties\":" + (buildPropsJson #("feedback", txt))
+            body += ",\"timestamp\":\"" + ((dotNetClass "System.DateTime").UtcNow.ToString "yyyy-MM-ddTHH:mm:ss.fffZ") + "\"}"
+            local wc = dotNetObject "System.Net.WebClient"
+            wc.Encoding = (dotNetClass "System.Text.Encoding").UTF8
+            wc.Headers.Add "Content-Type" "application/json"
+            wc.UploadString (apiHost + "/capture/") "POST" body
+            true
+        ) catch (
+            format "Feedback send failed: %\n" (getCurrentException())
+            false
+        )
     )
 )
 _51W_Telemetry = _51W_TelemetryStruct()
@@ -288,7 +309,7 @@ fn _51W_OnUpdateVersion sender args = (
     local _scriptPath = getSourceFileName()
 
     struct _51W_UpdaterStruct (
-        localVersion  = "3.1.3.3",
+        localVersion  = "3.1.4",
         rawBase       = "https://raw.githubusercontent.com/yimu-zhao/MaxToUE_Toolkit/main/",
         pat           = "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",
         iniPath       = (getDir #userScripts) + "\\_51W_Telemetry.ini",
@@ -2820,9 +2841,12 @@ rollout rl_Feedback "意见反馈" (
         if txt == "" then (
             messageBox "请先填写反馈内容。" title:"提示"
         ) else (
-            _51W_Telemetry.track "feedback_submitted" props:#("feedback", txt)
-            edt_feedback.text = ""
-            messageBox "✅ 反馈已发送，感谢！" title:"发送成功"
+            if (_51W_Telemetry.sendFeedback txt) then (
+                edt_feedback.text = ""
+                messageBox "✅ 反馈已发送，感谢！" title:"发送成功"
+            ) else (
+                messageBox "反馈发送失败，请检查网络后重试。" title:"发送失败"
+            )
         )
     )
 
@@ -2836,12 +2860,12 @@ rollout rl_Feedback "意见反馈" (
 rollout rl_Changelog "更新内容" (
     label lbl_compat "推荐 3ds Max 2022+  |  2019/2020 标题颜色异常但功能正常" align:#center
     label lbl_sep    "────────────────────────────────────"          align:#center
-    label lbl_ver    "【v3.1.3.3   2026-07-16】"                       align:#center
-    label lbl_l1     "test3" align:#center
-    label lbl_l2     "【v3.1.2】UVW Box 面选：只对选中面生效，重复点击不叠加" align:#center
-    label lbl_l3     "【v3.1.1】新增优化工具大类 / 导出路径记忆 / 烘焙AO 可选 UV"    align:#center
-    label lbl_l4     "【v3.1.1】批量导出提速、多选导出稳定性修复"     align:#center
-    label lbl_l5     ""       align:#center
+    label lbl_ver    "【v3.1.4   2026-07-16】"                         align:#center
+    label lbl_l1     "修复在线更新下载失败；权限不足时提示移动位置" align:#center
+    label lbl_l2     "修复意见反馈发送，据实提示成功 / 失败" align:#center
+    label lbl_l3     "【v3.1.2】UVW Box 面选：只对选中面生效，重复点击不叠加" align:#center
+    label lbl_l4     "【v3.1.1】新增优化工具大类 / 导出路径记忆 / 烘焙AO 可选 UV"    align:#center
+    label lbl_l5     "【v3.1.1】批量导出提速、多选导出稳定性修复"     align:#center
     label lbl_l6     ""                                              align:#center
     label lbl_more   "完整历史 → GitHub / ChangeLOG.md"               align:#center
     button btn_update "已是最新版本" width:220 height:24 align:#center enabled:false
