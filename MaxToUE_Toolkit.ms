@@ -313,26 +313,14 @@ fn _51W_OnUpdateVersion sender args = (
             ) catch false
         ),
 
-        fn fetchBytes url timeoutMs:15000 = (
+        fn fetchToFile url destPath timeoutMs:15000 = (
             try (
-                local req = (dotNetClass "System.Net.HttpWebRequest").Create url
-                req.Timeout = timeoutMs
-                req.ReadWriteTimeout = timeoutMs
-                req.UserAgent = "MaxScript-UE-ResourceTool"
-                if pat != "******" do req.Headers.Add "Authorization" ("token " + pat)
-                local resp = req.GetResponse()
-                local ms = dotNetObject "System.IO.MemoryStream"
-                local stream = resp.GetResponseStream()
-                local buf = (dotNetClass "System.Byte[]").CreateInstance 8192
-                local n = stream.Read buf 0 buf.Length
-                while n > 0 do (
-                    ms.Write buf 0 n
-                    n = stream.Read buf 0 buf.Length
-                )
-                stream.Close()
-                resp.Close()
-                ms.ToArray()
-            ) catch (undefined)
+                local wc = dotNetObject "System.Net.WebClient"
+                wc.Headers.Add "User-Agent" "MaxScript-UE-ResourceTool"
+                if pat != "******" do wc.Headers.Add "Authorization" ("token " + pat)
+                wc.DownloadFile url destPath
+                true
+            ) catch (false)
         ),
 
         fn checkAsync = (
@@ -357,12 +345,21 @@ fn _51W_OnUpdateVersion sender args = (
             if not updateAvailable do return false
             if confirm and not (queryBox ("发现新版本 " + remoteVersion + "（当前 " + localVersion + "）\n\n是否立即下载更新？\n下载完成后请重新运行脚本。") \
                 title:"MaxToUE Toolkit 有更新") do return false
-            local bytes = fetchBytes (rawBase + "MaxToUE_Toolkit.ms") timeoutMs:15000
-            if bytes != undefined then (
-                (dotNetClass "System.IO.File").WriteAllBytes scriptPath bytes
-                messageBox "更新完成！\n请重新运行脚本以加载新版本。" title:"更新成功"
-                true
+            local tmpPath = scriptPath + ".download.tmp"
+            local ok = (fetchToFile (rawBase + "MaxToUE_Toolkit.ms") tmpPath timeoutMs:15000)
+            if ok and (doesFileExist tmpPath) and ((getFileSize tmpPath) > 0) then (
+                try (
+                    deleteFile scriptPath
+                    (dotNetClass "System.IO.File").Move tmpPath scriptPath
+                    messageBox "更新完成！\n请重新运行脚本以加载新版本。" title:"更新成功"
+                    true
+                ) catch (
+                    try (deleteFile tmpPath) catch ()
+                    messageBox "写入失败，请重试。" title:"更新失败"
+                    false
+                )
             ) else (
+                try (deleteFile tmpPath) catch ()
                 messageBox "下载失败，请检查网络后重试。" title:"更新失败"
                 false
             )
