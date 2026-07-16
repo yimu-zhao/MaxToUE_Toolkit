@@ -2811,30 +2811,6 @@ rollout rl_Feedback "意见反馈" (
     label lbl_hint "遇到问题或有功能建议？填写后发送给开发者。" align:#left
     edittext edt_feedback "" height:80 width:220 align:#center
     button btn_send "📨 发送反馈" width:220 height:26 align:#center
-    button btn_tel_check "🩺 埋点自检" width:220 height:24 align:#center
-
-    fn telemetrySelfCheck = (
-        _51W_Telemetry.ensureUser()
-        local en = _51W_Telemetry.enabled
-        local host = _51W_Telemetry.apiHost
-        local did = _51W_Telemetry.distinctId
-        local iniEnabled = getINISetting _51W_Telemetry.iniPath "Telemetry" "Enabled"
-        local iniMigrated = getINISetting _51W_Telemetry.iniPath "Telemetry" "OptInMigrated"
-        local keyPrefix = ""
-        try (keyPrefix = substring _51W_Telemetry.apiKey 1 12) catch ()
-        local sent = false
-        if en do sent = _51W_Telemetry.track "telemetry_self_check" props:#("source", "ui_self_check")
-        local msg = "Enabled: " + (en as string) + "\n"
-        msg += "INI.Enabled: " + iniEnabled + "  |  INI.OptInMigrated: " + iniMigrated + "\n"
-        msg += "Host: " + host + "\n"
-        msg += "Key前缀: " + keyPrefix + "\n"
-        msg += "DistinctId: " + did + "\n"
-        if en then
-            msg += (if sent then "结果: 测试事件已发送（telemetry_self_check）。" else "结果: 发送失败，请查看 Listener 报错。")
-        else
-            msg += "结果: Telemetry 当前关闭（Enabled=false），未发送测试事件。"
-        messageBox msg title:"Telemetry自检"
-    )
 
     on btn_send pressed do (
         local txt = trimRight (trimLeft edt_feedback.text)
@@ -2848,10 +2824,6 @@ rollout rl_Feedback "意见反馈" (
                 messageBox "反馈发送失败，请检查网络后重试。" title:"发送失败"
             )
         )
-    )
-
-    on btn_tel_check pressed do (
-        try (telemetrySelfCheck()) catch (messageBox (getCurrentException()) title:"Telemetry自检")
     )
 )
 
