@@ -108,7 +108,7 @@ struct _51W_TelemetryStruct (
     -- ★ 在这里填入你从 PostHog 拿到的 Project API Key (phc_ 开头) ★
     apiKey = "phc_y4SakH8nP3PwXrkZyBGjNF2dqDh67wgN8qnk2xYMzfom",
     apiHost = "https://us.i.posthog.com",
-    scriptVersion = "3.1.4",
+    scriptVersion = "3.1.5",
 
     iniPath = (getDir #userScripts) + "\\_51W_Telemetry.ini",
     enabled = true,
@@ -309,7 +309,7 @@ fn _51W_OnUpdateVersion sender args = (
     local _scriptPath = getSourceFileName()
 
     struct _51W_UpdaterStruct (
-        localVersion  = "3.1.4",
+        localVersion  = "3.1.5",
         rawBase       = "https://raw.githubusercontent.com/yimu-zhao/MaxToUE_Toolkit/main/",
         pat           = "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",
         iniPath       = (getDir #userScripts) + "\\_51W_Telemetry.ini",
@@ -755,6 +755,7 @@ rollout rl_Optimize "优化工具" (
         local angThresh = spn_isoAng.value as float
         local total = 0; local checked = 0; local skipped = 0
         local oldSubLevel = subObjectLevel
+        if oldSubLevel == undefined do oldSubLevel = 0
         undo "移除废点" on (
             for obj in objs do (
                 if not (ensurePoly obj) do (skipped += 1; continue)
@@ -784,6 +785,7 @@ rollout rl_Optimize "优化工具" (
         local total = 0; local checked = 0; local skipped = 0
         local oldSel = selection as array
         local oldSubLevel = subObjectLevel
+        if oldSubLevel == undefined do oldSubLevel = 0
         undo "焊接重合点" on (
             for obj in objs do (
                 if not (ensurePoly obj) do (skipped += 1; continue)
@@ -819,6 +821,7 @@ rollout rl_Optimize "优化工具" (
         local angThresh = spn_quadAng.value as float
         local totalRemoved = 0; local checked = 0; local skipped = 0
         local oldSubLevel = subObjectLevel
+        if oldSubLevel == undefined do oldSubLevel = 0
         undo "去对角线" on (
             for obj in objs do (
                 if not (ensurePoly obj) do (skipped += 1; continue)
@@ -1174,6 +1177,7 @@ rollout rl_FBXExport "批量导出" (
 
     on rl_FBXExport open do (
         applyPath()
+        btn_export.text = if rdo_mode.state == 1 then "导出选中模型" else "导出位置信息到剪切板"
         callbacks.removeScripts id:#rl_FBXExport_SelChg
         callbacks.addScript #selectionSetChanged "try(rl_FBXExport.refreshPreview())catch()" id:#rl_FBXExport_SelChg
         callbacks.removeScripts id:#rl_FBXExport_FileOpen
@@ -1184,6 +1188,7 @@ rollout rl_FBXExport "批量导出" (
         callbacks.removeScripts id:#rl_FBXExport_FileOpen
     )
     on btn_browse pressed do (local p = getSavePath caption:"选择FBX导出路径"; if p != undefined do (edt_path.text = p; _51W_Data.exportPath = p; saveScenePath p; refreshPreview()))
+    on rdo_mode changed st do (btn_export.text = if st == 1 then "导出选中模型" else "导出位置信息到剪切板")
     on edt_path entered txt do (_51W_Data.exportPath = txt; saveScenePath txt; refreshPreview())
     on btn_clear pressed do (edt_path.text = ""; _51W_Data.exportPath = ""; saveScenePath "")
     on btn_open pressed do (if edt_path.text != "" and doesFileExist edt_path.text do shellLaunch "explorer.exe" edt_path.text)
@@ -1238,10 +1243,29 @@ rollout rl_FBXExport "批量导出" (
             completeRedraw()
             refreshPreview()
         ) else (
-            local s = ""
-            for obj in objs do s += obj.name + " @ [" + obj.pos.x as string + "," + obj.pos.y as string + "," + obj.pos.z as string + "]\n"
-            setClipBoardText s
-            messageBox ("已复制 " + objs.count as string + " 个位置到剪切板。") title:"FBX导出"
+            -- 生成 UE 可识别的 T3D，Ctrl+V 直接粘出带位置的空 StaticMeshActor（网格手动指定）
+            -- Max 右手 Z-up → UE 左手 Z-up：X 不变，Y 取反，Z 不变
+            local sb = "Begin Map\r\n\tBegin Level\r\n"
+            local i = 0
+            for obj in objs do (
+                local p = obj.pos
+                local lx = formattedPrint p.x format:".6f"
+                local ly = formattedPrint (-p.y) format:".6f"
+                local lz = formattedPrint p.z format:".6f"
+                sb += "\t\tBegin Actor Class=/Script/Engine.StaticMeshActor Name=StaticMeshActor_" + (i as string) + " Archetype=/Script/Engine.StaticMeshActor'/Script/Engine.Default__StaticMeshActor'\r\n"
+                sb += "\t\t\tBegin Object Class=/Script/Engine.StaticMeshComponent Name=\"StaticMeshComponent0\"\r\n"
+                sb += "\t\t\tEnd Object\r\n"
+                sb += "\t\t\tBegin Object Name=\"StaticMeshComponent0\"\r\n"
+                sb += "\t\t\t\tRelativeLocation=(X=" + lx + ",Y=" + ly + ",Z=" + lz + ")\r\n"
+                sb += "\t\t\tEnd Object\r\n"
+                sb += "\t\t\tRootComponent=StaticMeshComponent0\r\n"
+                sb += "\t\t\tActorLabel=\"" + obj.name + "\"\r\n"
+                sb += "\t\tEnd Actor\r\n"
+                i += 1
+            )
+            sb += "\tEnd Level\r\nEnd Map\r\n"
+            setClipBoardText sb
+            messageBox ("已复制 " + objs.count as string + " 个位置到剪切板。\n可在 UE 关卡视口按 Ctrl+V 粘贴出对应位置的空模型 Actor。") title:"FBX导出"
         )
     )
 )
@@ -2832,13 +2856,13 @@ rollout rl_Feedback "意见反馈" (
 rollout rl_Changelog "更新内容" (
     label lbl_compat "推荐 3ds Max 2022+  |  2019/2020 标题颜色异常但功能正常" align:#center
     label lbl_sep    "────────────────────────────────────"          align:#center
-    label lbl_ver    "【v3.1.4   2026-07-16】"                         align:#center
-    label lbl_l1     "修复在线更新下载失败；权限不足时提示移动位置" align:#center
-    label lbl_l2     "修复意见反馈发送，据实提示成功 / 失败" align:#center
-    label lbl_l3     "【v3.1.2】UVW Box 面选：只对选中面生效，重复点击不叠加" align:#center
-    label lbl_l4     "【v3.1.1】新增优化工具大类 / 导出路径记忆 / 烘焙AO 可选 UV"    align:#center
-    label lbl_l5     "【v3.1.1】批量导出提速、多选导出稳定性修复"     align:#center
-    label lbl_l6     ""                                              align:#center
+    label lbl_ver    "【v3.1.5   2026-08-24】"                         align:#center
+    label lbl_l1     "剪切位置信息到剪切板，支持在UE直接Ctrl+V粘出Actor" align:#center
+    label lbl_l2     "修复未打开修改面板时，去对角线/焊接/移除废点报错" align:#center
+    label lbl_l3     "【v3.1.4】修复在线更新下载失败、意见反馈发送" align:#center
+    label lbl_l4     "【v3.1.2】UVW Box 面选：只对选中面生效，重复点击不叠加" align:#center
+    label lbl_l5     "【v3.1.1】新增优化工具大类 / 导出路径记忆 / 烘焙AO 可选 UV"    align:#center
+    label lbl_l6     "【v3.1.1】批量导出提速、多选导出稳定性修复"     align:#center
     label lbl_more   "完整历史 → GitHub / ChangeLOG.md"               align:#center
     button btn_update "已是最新版本" width:220 height:24 align:#center enabled:false
 
