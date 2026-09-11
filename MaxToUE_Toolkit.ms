@@ -108,7 +108,7 @@ struct _51W_TelemetryStruct (
     -- ★ 在这里填入你从 PostHog 拿到的 Project API Key (phc_ 开头) ★
     apiKey = "phc_y4SakH8nP3PwXrkZyBGjNF2dqDh67wgN8qnk2xYMzfom",
     apiHost = "https://us.i.posthog.com",
-    scriptVersion = "3.1.5",
+    scriptVersion = "3.1.6",
 
     iniPath = (getDir #userScripts) + "\\_51W_Telemetry.ini",
     enabled = true,
@@ -309,7 +309,7 @@ fn _51W_OnUpdateVersion sender args = (
     local _scriptPath = getSourceFileName()
 
     struct _51W_UpdaterStruct (
-        localVersion  = "3.1.5",
+        localVersion  = "3.1.6",
         rawBase       = "https://raw.githubusercontent.com/yimu-zhao/MaxToUE_Toolkit/main/",
         pat           = "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",
         iniPath       = (getDir #userScripts) + "\\_51W_Telemetry.ini",
@@ -557,73 +557,94 @@ rollout rl_MatOptimize "材质优化" (
         local objs = selection as array
         if objs.count == 0 do (messageBox "请先选择对象。" title:"材质优化"; return ())
         local maxID = 0, srcCnt = 0, curCnt = 0
-        for obj in objs do (
-            local n = (_51W_Data.getMatIDs obj).numberSet
-            if n > maxID do maxID = n
-            if obj.material != undefined do (
-                if classOf obj.material == MultiMaterial then (
-                    -- 统计“实际使用的ID数”，避免 materialList 槽位残留导致显示偏大
-                    srcCnt += n
-                ) else srcCnt += 1
-            )
-        )
-        lbl_maxID.text = "最多ID数目：  " + maxID as string
-        lbl_srcMat.text = "原材质数目：  " + srcCnt as string
-        local optimizedObjs = 0
-        undo "Optimize Materials" on (
-            for obj in objs where obj.material != undefined and classOf obj.material == MultiMaterial and superClassOf obj == GeometryClass do (
+        -- 每个对象只扫一次面（getMatIDs 是遍历全部面的重操作），缓存结果供后面优化/统计复用，避免重复扫描
+        local usedList = #()
+        disableSceneRedraw()
+        try (
+            for obj in objs do (
                 local used = _51W_Data.getMatIDs obj
-                local mm = obj.material
-                local keyList = #()
-                local newSubs = #()
-                local idMap = #()
-                local usedCount = 0
-                for oldID in used do (
-                    local srcIdx = findItem mm.materialIDList oldID
-                    if srcIdx == 0 and oldID >= 1 and oldID <= mm.materialList.count do srcIdx = oldID
-                    if srcIdx > 0 and srcIdx <= mm.materialList.count and mm.materialList[srcIdx] != undefined do (
-                        usedCount += 1
-                        local subMat = mm.materialList[srcIdx]
-                        local k = ""
-                        local n = ""
-                        try (n = subMat.name as string) catch ()
-                        n = trimLeft (trimRight n)
-                        if n != "" then k = ("name:" + (toLower n)) else k = ("slot:" + srcIdx as string)
-                        local mappedIdx = findItem keyList k
-                        if mappedIdx == 0 do (
-                            append keyList k
-                            append newSubs subMat
-                            mappedIdx = newSubs.count
-                        )
-                        idMap[oldID] = mappedIdx
+                append usedList used
+                local n = used.numberSet
+                if n > maxID do maxID = n
+                if obj.material != undefined do (
+                    if classOf obj.material == MultiMaterial then (
+                        -- 统计“实际使用的ID数”，避免 materialList 槽位残留导致显示偏大
+                        srcCnt += n
+                        -- 现材质数目先按“优化前”初始化，下面优化成功的对象会把这部分覆盖成优化后的数目
+                        curCnt += n
+                    ) else (
+                        srcCnt += 1
+                        curCnt += 1
                     )
                 )
-                if newSubs.count == 0 do continue
-                local nm = MultiMaterial numsubs:newSubs.count name:mm.name
-                for i = 1 to newSubs.count do (
-                    nm.materialList[i] = newSubs[i]
-                    nm.materialIDList[i] = i
-                )
-                if classOf obj.baseObject != Editable_Poly do convertToPoly obj
-                for f = 1 to (polyop.getNumFaces obj) do (
-                    local oldID = polyop.getFaceMatID obj f
-                    if idMap[oldID] != undefined do polyop.setFaceMatID obj f idMap[oldID]
-                )
-                obj.material = nm
-                if newSubs.count < usedCount then optimizedObjs += 1
             )
-        )
-        for obj in objs where obj.material != undefined do (
-            if classOf obj.material == MultiMaterial then
-                curCnt += (_51W_Data.getMatIDs obj).numberSet
+            lbl_maxID.text = "最多ID数目：  " + maxID as string
+            lbl_srcMat.text = "原材质数目：  " + srcCnt as string
+            local optimizedObjs = 0
+            undo "Optimize Materials" on (
+                for i = 1 to objs.count where objs[i].material != undefined and classOf objs[i].material == MultiMaterial and superClassOf objs[i] == GeometryClass do (
+                    local obj = objs[i]
+                    local used = usedList[i]
+                    local mm = obj.material
+                    local keyList = #()
+                    local newSubs = #()
+                    local idMap = #()
+                    local usedCount = 0
+                    for oldID in used do (
+                        local srcIdx = findItem mm.materialIDList oldID
+                        if srcIdx == 0 and oldID >= 1 and oldID <= mm.materialList.count do srcIdx = oldID
+                        if srcIdx > 0 and srcIdx <= mm.materialList.count and mm.materialList[srcIdx] != undefined do (
+                            usedCount += 1
+                            local subMat = mm.materialList[srcIdx]
+                            local k = ""
+                            local n = ""
+                            try (n = subMat.name as string) catch ()
+                            n = trimLeft (trimRight n)
+                            if n != "" then k = ("name:" + (toLower n)) else k = ("slot:" + srcIdx as string)
+                            local mappedIdx = findItem keyList k
+                            if mappedIdx == 0 do (
+                                append keyList k
+                                append newSubs subMat
+                                mappedIdx = newSubs.count
+                            )
+                            idMap[oldID] = mappedIdx
+                        )
+                    )
+                    if newSubs.count == 0 do continue
+                    local nm = MultiMaterial numsubs:newSubs.count name:mm.name
+                    for k = 1 to newSubs.count do (
+                        nm.materialList[k] = newSubs[k]
+                        nm.materialIDList[k] = k
+                    )
+                    if classOf obj.baseObject != Editable_Poly do convertToPoly obj
+                    -- 按“旧ID”把面收集进对应的位数组，每个ID只调用一次 setFaceMatID（批量设置），
+                    -- 而不是对每个面单独调用一次——这是复杂模型卡顿的主因（原逻辑是逐面调用两次）
+                    local facesByOldID = #()
+                    local numF = polyop.getNumFaces obj
+                    for f = 1 to numF do (
+                        local oldID = polyop.getFaceMatID obj f
+                        if idMap[oldID] != undefined do (
+                            if facesByOldID[oldID] == undefined do facesByOldID[oldID] = #{}
+                            facesByOldID[oldID][f] = true
+                        )
+                    )
+                    for oldID = 1 to facesByOldID.count where facesByOldID[oldID] != undefined do
+                        polyop.setFaceMatID obj facesByOldID[oldID] idMap[oldID]
+                    obj.material = nm
+                    if newSubs.count < usedCount do (
+                        optimizedObjs += 1
+                        curCnt += newSubs.count - used.numberSet  -- 用优化后的数目替换之前按原始数目累加的部分
+                    )
+                )
+            )
+            lbl_curMat.text = "现材质数目：  " + curCnt as string
+            if optimizedObjs == 0 then
+                messageBox "未发现可优化的子材质槽（可能当前ID都在使用或对象不是几何体）。" title:"材质优化"
             else
-                curCnt += 1
-        )
-        lbl_curMat.text = "现材质数目：  " + curCnt as string
-        if optimizedObjs == 0 then
-            messageBox "未发现可优化的子材质槽（可能当前ID都在使用或对象不是几何体）。" title:"材质优化"
-        else
-            messageBox ("材质优化完成！已处理 " + optimizedObjs as string + " 个对象。") title:"材质优化"
+                messageBox ("材质优化完成！已处理 " + optimizedObjs as string + " 个对象。") title:"材质优化"
+        ) catch (format "材质优化异常: %\n" (getCurrentException()))
+        enableSceneRedraw()
+        completeRedraw()
     )
 
     on btn_vray_sel pressed do (
@@ -2856,13 +2877,13 @@ rollout rl_Feedback "意见反馈" (
 rollout rl_Changelog "更新内容" (
     label lbl_compat "推荐 3ds Max 2022+  |  2019/2020 标题颜色异常但功能正常" align:#center
     label lbl_sep    "────────────────────────────────────"          align:#center
-    label lbl_ver    "【v3.1.5   2026-08-24】"                         align:#center
-    label lbl_l1     "剪切位置信息到剪切板，支持在UE直接Ctrl+V粘出Actor" align:#center
-    label lbl_l2     "修复未打开修改面板时，去对角线/焊接/移除废点报错" align:#center
-    label lbl_l3     "【v3.1.4】修复在线更新下载失败、意见反馈发送" align:#center
-    label lbl_l4     "【v3.1.2】UVW Box 面选：只对选中面生效，重复点击不叠加" align:#center
-    label lbl_l5     "【v3.1.1】新增优化工具大类 / 导出路径记忆 / 烘焙AO 可选 UV"    align:#center
-    label lbl_l6     "【v3.1.1】批量导出提速、多选导出稳定性修复"     align:#center
+    label lbl_ver    "【v3.1.6   2026-09-11】"                         align:#center
+    label lbl_l1     "材质优化提速：复杂模型不再卡顿" align:#center
+    label lbl_l2     "【v3.1.5】剪切位置信息到剪切板，支持在UE直接Ctrl+V粘出Actor" align:#center
+    label lbl_l3     "【v3.1.5】修复未打开修改面板时，去对角线/焊接/移除废点报错" align:#center
+    label lbl_l4     "【v3.1.4】修复在线更新下载失败、意见反馈发送" align:#center
+    label lbl_l5     "【v3.1.2】UVW Box 面选：只对选中面生效，重复点击不叠加" align:#center
+    label lbl_l6     "【v3.1.1】新增优化工具大类 / 导出路径记忆 / 烘焙AO 可选 UV"    align:#center
     label lbl_more   "完整历史 → GitHub / ChangeLOG.md"               align:#center
     button btn_update "已是最新版本" width:220 height:24 align:#center enabled:false
 
